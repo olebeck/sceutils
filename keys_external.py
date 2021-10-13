@@ -1,7 +1,14 @@
-from scetypes import *
+import binascii
+from scetypes import KeyType, KeyStore, SceType, SelfType
 
 ENC_KEY = binascii.a2b_hex('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
 ENC_IV =  binascii.a2b_hex('AF5F2CB04AC1751ABF51CEF1C8096210')
+
+SCEWM_KEY = binascii.a2b_hex("BFD5EA9F91AE9AF23565E534C4823B72")
+SCEWM_IV =  binascii.a2b_hex("CE16937E97A3349F143C8FB6AA219528")
+
+SCEAS_KEY = binascii.a2b_hex("AC5AB4907867FE8017072C98280DC311")
+SCEAS_IV =  binascii.a2b_hex("ACDFA94246D31970B7925FF7A26B0036")
 
 SCE_KEYS = KeyStore()
 SCE_KEYS.register(

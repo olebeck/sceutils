@@ -6,6 +6,7 @@ from enum import Enum
 
 EMMC_BLOCK_SIZE = 512
 
+
 class EmmcPartitionCode(Enum):
     EMPTY = 0
     IDSTORAGE = 1
@@ -23,6 +24,7 @@ class EmmcPartitionCode(Enum):
     UNKOWN_MC = 0xD
     PD0 = 0xE
 
+
 class EmmcPartitionType(Enum):
     UNKNOWN_0 = 0
     FAT16 = 0x6
@@ -30,12 +32,14 @@ class EmmcPartitionType(Enum):
     UNKNOWN = 0xB
     RAW = 0xDA
 
+
 def sizeof_fmt(num, suffix='B'):
-    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
         if abs(num) < 1024.0:
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f%s%s" % (num, 'Yi', suffix)
+
 
 class EmmcPartition:
     Size = 0x11
@@ -50,8 +54,8 @@ class EmmcPartition:
             self.flags,
         ) = struct.unpack('<IIBB?I2x', data)
 
-        self.offset = offset*EMMC_BLOCK_SIZE
-        self.size = size*EMMC_BLOCK_SIZE
+        self.offset = offset * EMMC_BLOCK_SIZE
+        self.size = size * EMMC_BLOCK_SIZE
         self.code = EmmcPartitionCode(code)
         self.type = EmmcPartitionType(type)
 
@@ -65,6 +69,7 @@ class EmmcPartition:
         str += 'Active:           {}\n'.format(self.active)
         str += 'Flags:            0x{:08X}\n'.format(self.flags)
         return str
+
 
 class EmmcMasterBlock:
     Size = 0x200
@@ -83,24 +88,25 @@ class EmmcMasterBlock:
         if self.version != 3:
             raise TypeError('Unknown version')
 
-        self.size = size*EMMC_BLOCK_SIZE
+        self.size = size * EMMC_BLOCK_SIZE
 
         partitions = data[0x50:0x160]
-        partitions = [EmmcPartition(partitions[x:x+EmmcPartition.Size]) for x in range(0, len(partitions), EmmcPartition.Size)]
+        partitions = [EmmcPartition(partitions[x:x + EmmcPartition.Size]) for x in range(0, len(partitions), EmmcPartition.Size)]
         self.partitions = [p for p in itertools.takewhile(lambda x: x.offset != 0, partitions)]
 
     def __str__(self):
         str = ''
         str += 'EmmcMasterBlock:\n'
-        str += 'Magic:          {}\n'.format(self.magic)
-        str += 'Version:        {}\n'.format(self.version)
-        str += 'Size (bytes):   0x{:X} ({})\n'.format(self.size, sizeof_fmt(self.size))
+        str += f'Magic:          {self.magic}\n'
+        str += f'Version:        {self.version}\n'
+        str += f'Size (bytes):   0x{self.size:X} ({sizeof_fmt(self.size)})\n'
         str += 'Partitions:\n'
 
         for p in self.partitions:
-            str += '{}\n'.format(p)
+            str += f'{p}\n'
 
         return str
+
 
 if __name__ == "__main__":
     with open(sys.argv[1], "rb") as emmc:
@@ -108,12 +114,16 @@ if __name__ == "__main__":
         print(master)
 
         for p in master.partitions:
-            if len([x for x in master.partitions if x.code == p.code]) > 1:
-                name = '{}_{}.bin'.format(str(p.code).split('.', 1)[-1], 'active' if p.active else 'inactive').lower()
-            else:
-                name = '{}.bin'.format(str(p.code).split('.', 1)[-1]).lower()
+            has_inactive = len([x for x in master.partitions if x.code == p.code]) > 1
+            active_str = ""
+            if has_inactive:
+                active_str = "_active" if p.active else "_inactive"
 
-            print('extracting {}... '.format(name))
+            part_code = str(p.code).split(".", 1)[-1]
+
+            name = f'{part_code}{active_str}.bin'.lower()
+
+            print(f'extracting {name}... ')
 
             with open(name, 'wb') as f:
                 emmc.seek(p.offset)
@@ -121,13 +131,12 @@ if __name__ == "__main__":
 
                 while length != p.size:
                     data = emmc.read(p.size - length)
-                    if len(data) == 0 or data == None:
-                      break
+                    if len(data) == 0 or data is None:
+                        break
 
                     f.write(data)
                     length += len(data)
-                    print('{:.2f}%... '.format(100*length/p.size))
+                    print(f'{100*length/p.size:.2f}%... ')
 
             if length != p.size:
-                print('output {} is truncated ({:.2f}% dumped)'.format(name, 100*length/p.size))
-
+                print(f'output {name} is truncated ({100*length/p.size:.2f}% dumped)')

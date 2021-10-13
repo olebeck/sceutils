@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import os
 import sys
@@ -8,46 +8,48 @@ import sceutils
 from scetypes import SecureBool, SceHeader, SelfHeader, AppInfoHeader, ElfHeader, ElfPhdr, SegmentInfo, SceVersionInfo, SceControlInfo, SceControlInfoDigest256, ControlType, SceControlInfoDRM, SceRIF
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
+from importlib import import_module
+
 
 def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_sysver=False):
-    npdrmtype=0
+    npdrmtype = 0
     sce = SceHeader(inf.read(SceHeader.Size))
     if not silent:
-        print sce
+        print(sce)
     self_hdr = SelfHeader(inf.read(SelfHeader.Size))
     inf.seek(self_hdr.appinfo_offset)
     appinfo_hdr = AppInfoHeader(inf.read(AppInfoHeader.Size))
     if ignore_sysver:
         appinfo_hdr.sys_version = -1
     if not silent:
-        print appinfo_hdr
+        print(appinfo_hdr)
     inf.seek(self_hdr.sceversion_offset)
     verinfo_hdr = SceVersionInfo(inf.read(SceVersionInfo.Size))
     if not silent:
-        print verinfo_hdr
+        print(verinfo_hdr)
     inf.seek(self_hdr.controlinfo_offset)
     controlinfo_hdr = SceControlInfo(inf.read(SceControlInfo.Size))
     ci_off = SceControlInfo.Size
     if not silent:
-        print controlinfo_hdr
-    if controlinfo_hdr.type == ControlType.DIGEST_SHA256: 
-        inf.seek(self_hdr.controlinfo_offset+ci_off)
+        print(controlinfo_hdr)
+    if controlinfo_hdr.type == ControlType.DIGEST_SHA256:
+        inf.seek(self_hdr.controlinfo_offset + ci_off)
         ci_off += SceControlInfoDigest256.Size
         controldigest256 = SceControlInfoDigest256(inf.read(SceControlInfoDigest256.Size))
         if not silent:
-            print controldigest256
-    inf.seek(self_hdr.controlinfo_offset+ci_off)
+            print(controldigest256)
+    inf.seek(self_hdr.controlinfo_offset + ci_off)
     controlinfo_hdr = SceControlInfo(inf.read(SceControlInfo.Size))
     if not silent:
-        print controlinfo_hdr    
+        print(controlinfo_hdr)
     ci_off += SceControlInfo.Size
     if controlinfo_hdr.type == ControlType.NPDRM_VITA:
-        inf.seek(self_hdr.controlinfo_offset+ci_off)
+        inf.seek(self_hdr.controlinfo_offset + ci_off)
         ci_off += SceControlInfoDRM.Size
         controlnpdrm = SceControlInfoDRM(inf.read(SceControlInfoDRM.Size))
-        npdrmtype=controlnpdrm.npdrm_type
+        npdrmtype = controlnpdrm.npdrm_type
         if not silent:
-            print controlnpdrm
+            print(controlnpdrm)
 
     # copy elf header
     inf.seek(self_hdr.elf_offset)
@@ -55,7 +57,7 @@ def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_
     outf.write(dat)
     elf_hdr = ElfHeader(dat)
     if not silent:
-        print elf_hdr
+        print(elf_hdr)
     # get segments
     elf_phdrs = {}
     segment_infos = {}
@@ -63,22 +65,22 @@ def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_
     at = ElfHeader.Size
     for i in range(elf_hdr.e_phnum):
         # phdr
-        inf.seek(self_hdr.phdr_offset + i*ElfPhdr.Size)
+        inf.seek(self_hdr.phdr_offset + i * ElfPhdr.Size)
         dat = inf.read(ElfPhdr.Size)
         phdr = ElfPhdr(dat)
         if not silent:
-            print phdr
-        #elf_phdrs.append(phdr)
+            print(phdr)
+        # elf_phdrs.append(phdr)
         elf_phdrs[i] = phdr
         # write phdr
         outf.write(dat)
         at += ElfPhdr.Size
         # seg info
-        inf.seek(self_hdr.segment_info_offset + i*SegmentInfo.Size)
+        inf.seek(self_hdr.segment_info_offset + i * SegmentInfo.Size)
         segment_info = SegmentInfo(inf.read(SegmentInfo.Size))
         if not silent:
-            print segment_info
-        #segment_infos.append(segment_info)
+            print(segment_info)
+        # segment_infos.append(segment_info)
         segment_infos[i] = segment_info
         if segment_info.plaintext == SecureBool.NO:
             encrypted = True
@@ -92,17 +94,17 @@ def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_
         if scesegs:
             idx = scesegs[i].idx
         else:
-            idx=i
-                
+            idx = i
+
         if elf_phdrs[idx].p_filesz == 0:
             continue
         if not silent:
-            print 'Dumping segment {0}...'.format(idx)
+            print(f'Dumping segment {idx}...')
         # padding
-        #print elf_phdrs[i].p_offset
+        # print(elf_phdrs[i].p_offset)
         pad_len = elf_phdrs[idx].p_offset - at
         if pad_len < 0:
-            print pad_len
+            print(pad_len)
             raise RuntimeError("ELF p_offset invalid!")
         outf.write(b"\x00" * pad_len)
         at += pad_len
@@ -111,7 +113,7 @@ def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_
         dat = inf.read(segment_infos[idx].size)
         # encryption
         if segment_infos[idx].plaintext == SecureBool.NO:
-            ctr = Counter.new(128, initial_value=long(scesegs[i].iv.encode("hex"), 16))
+            ctr = Counter.new(128, initial_value=int.from_bytes(scesegs[i].iv, "big"))
             section_aes = AES.new(scesegs[i].key, AES.MODE_CTR, counter=ctr)
             dat = section_aes.decrypt(dat)
         # compression
@@ -122,19 +124,28 @@ def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_
         outf.write(dat)
         at += len(dat)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--inputfile", help="input file name", type=str)
-    parser.add_argument("-o", "--outputfile", help="output file name", type=str)
-    parser.add_argument("-k", "--keyriffile", help="NoNpdrm RIF file name", type=str)
-    args=parser.parse_args()
+
+def main(args):
+    sys.modules["keys"] = import_module(args.keys.split(".")[0])
     with open(args.inputfile, "rb") as inf:
         with open(args.outputfile, "wb") as outf:
             if args.keyriffile:
                 with open(args.keyriffile, "rb") as rif:
                     lic = SceRIF(rif.read(SceRIF.Size))
                     self2elf(inf, outf, lic.klicense)
+            elif args.zrif:
+                rif = sceutils.zrif_decode(args.zrif)[:SceRIF.Size]
+                lic = SceRIF(rif)
+                self2elf(inf, outf, lic.klicense)
             else:
-                self2elf(inf, outf, 0)
-                        
-                    
+                self2elf(inf, outf, b"0")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--inputfile", help="input file name", type=str, required=True)
+    parser.add_argument("-o", "--outputfile", help="output file name", type=str, required=True)
+    parser.add_argument("-k", "--keyriffile", help="NoNpdrm RIF file name", type=str)
+    parser.add_argument("-z", "--zrif", help="zrif string", type=str)
+    parser.add_argument("-K", "--keys", help="keys filename", type=str, default="keys_external.py")
+    main(parser.parse_args())

@@ -1,36 +1,41 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import os
 import sys
 import zlib
 import sceutils
-from scetypes import SecureBool, SceHeader, SelfHeader, AppInfoHeader, ElfHeader, ElfPhdr, SegmentInfo
+from scetypes import SceHeader
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
+from importlib import import_module
+
 
 def scedecrypt(inf, outdir, decompress=True, silent=False):
     sce = SceHeader(inf.read(SceHeader.Size))
     if not silent:
-        print sce
+        print(sce)
     (sysver, selftype) = sceutils.get_key_type(inf, sce, silent)
     scesegs = sceutils.get_segments(inf, sce, sysver, selftype, silent=silent)
-    for i, sceseg in scesegs.iteritems():
+    for i, sceseg in scesegs.items():
         if not silent:
-            print 'Decrypting segment {0}...'.format(i)
-        outf = open(os.path.join(outdir, "{}.seg{:02}".format(os.path.basename(inf.name), i)), "wb")
+            print(f'Decrypting segment {i}...')
+        outf = open(os.path.join(outdir, f"{os.path.basename(inf.name)}.seg{i:02}"), "wb")
         inf.seek(sceseg.offset)
         dat = inf.read(sceseg.size)
-        ctr = Counter.new(128, initial_value=long(sceseg.iv.encode("hex"), 16))
+        ctr = Counter.new(128, initial_value=int.from_bytes(sceseg.iv, "big"))
         section_aes = AES.new(sceseg.key, AES.MODE_CTR, counter=ctr)
         dat = section_aes.decrypt(dat)
         if decompress and sceseg.compressed:
             if not silent:
-                print 'Decompressing segment {0}...'.format(i)
+                print(f'Decompressing segment {i}...')
             z = zlib.decompressobj()
             dat = z.decompress(dat)
         outf.write(dat)
-        
+
 
 if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("usage: scedecrypt.py filename keys_filename")
+    sys.modules["keys"] = import_module(sys.argv[2].split(".")[0])
     with open(sys.argv[1], "rb") as inf:
         scedecrypt(inf, sys.argv[2])
