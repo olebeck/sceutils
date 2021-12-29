@@ -2,6 +2,8 @@ import shutil
 from Crypto.Hash import SHA1
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 
+import scetypes
+import sceutils
 import self2elf
 import pup_fiction
 
@@ -60,3 +62,11 @@ class Test_pup_fiction:
             shutil.rmtree(tempdir)
             _test_pup_fiction(input_file, tempdir, keys)
             _test_wm(tempdir, known_wm_hash)
+
+
+def test_zrif():
+    rif_data = sceutils.zrif_decode("KO5ifR1dQ+d7BRgYGphBbbG0MAfZ7xTk4urn7urtGeLh6utqYIjPfwmdPwseyB0sSbfTn/9oip3YaIwPbgAANDMUlgAA")
+    rif = scetypes.SceRIF(rif_data)
+    print(rif)
+
+test_zrif()
