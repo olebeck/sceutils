@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import argparse
 import struct, sys, itertools
 from enum import Enum
 
@@ -36,9 +37,9 @@ class EmmcPartitionType(Enum):
 def sizeof_fmt(num, suffix='B'):
     for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
         if abs(num) < 1024.0:
-            return "%3.1f%s%s" % (num, unit, suffix)
+            return f"{num:3.1f}{unit}{suffix}"
         num /= 1024.0
-    return "%.1f%s%s" % (num, 'Yi', suffix)
+    return f"{num:.1f}Yi{suffix}"
 
 
 class EmmcPartition:
@@ -60,15 +61,15 @@ class EmmcPartition:
         self.type = EmmcPartitionType(type)
 
     def __str__(self):
-        str = ''
-        str += 'EmmcPartition:\n'
-        str += 'Offset (bytes):   0x{:X}\n'.format(self.offset)
-        str += 'Size (bytes):     0x{:X} ({})\n'.format(self.size, sizeof_fmt(self.size))
-        str += 'Code:             {}\n'.format(self.code)
-        str += 'Type:             {}\n'.format(self.type)
-        str += 'Active:           {}\n'.format(self.active)
-        str += 'Flags:            0x{:08X}\n'.format(self.flags)
-        return str
+        ret = ''
+        ret += 'EmmcPartition:\n'
+        ret += f'Offset (bytes):   0x{self.offset:X}\n'
+        ret += f'Size (bytes):     0x{self.size:X} ({sizeof_fmt(self.size)})\n'
+        ret += f'Code:             {self.code}\n'
+        ret += f'Type:             {self.type}\n'
+        ret += f'Active:           {self.active}\n'
+        ret += f'Flags:            0x{self.flags:08X}\n'
+        return ret
 
 
 class EmmcMasterBlock:
@@ -95,21 +96,25 @@ class EmmcMasterBlock:
         self.partitions = [p for p in itertools.takewhile(lambda x: x.offset != 0, partitions)]
 
     def __str__(self):
-        str = ''
-        str += 'EmmcMasterBlock:\n'
-        str += f'Magic:          {self.magic}\n'
-        str += f'Version:        {self.version}\n'
-        str += f'Size (bytes):   0x{self.size:X} ({sizeof_fmt(self.size)})\n'
-        str += 'Partitions:\n'
+        ret = ''
+        ret += 'EmmcMasterBlock:\n'
+        ret += f'Magic:          {self.magic}\n'
+        ret += f'Version:        {self.version}\n'
+        ret += f'Size (bytes):   0x{self.size:X} ({sizeof_fmt(self.size)})\n'
+        ret += 'Partitions:\n'
 
         for p in self.partitions:
-            str += f'{p}\n'
+            ret += f'{p}\n'
 
-        return str
+        return ret
 
 
-if __name__ == "__main__":
-    with open(sys.argv[1], "rb") as emmc:
+def main(args):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("emmc")
+    args = parser.parse_args(args)
+
+    with open(args.emmc, "rb") as emmc:
         master = EmmcMasterBlock(emmc.read(EmmcMasterBlock.Size))
         print(master)
 
@@ -140,3 +145,6 @@ if __name__ == "__main__":
 
             if length != p.size:
                 print(f'output {name} is truncated ({100*length/p.size:.2f}% dumped)')
+
+if __name__ == "__main__":
+    main(sys.argv)

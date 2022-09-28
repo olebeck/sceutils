@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
+import argparse
 import os
+import pathlib
 import sys
 import zlib
 import sceutils
@@ -8,6 +10,8 @@ from scetypes import SceHeader
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 from importlib import import_module
+
+from util import use_keys
 
 
 def scedecrypt(inf, outdir, decompress=True, silent=False):
@@ -34,8 +38,13 @@ def scedecrypt(inf, outdir, decompress=True, silent=False):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("usage: scedecrypt.py filename keys_filename")
-    sys.modules["keys"] = import_module(sys.argv[2].split(".")[0])
-    with open(sys.argv[1], "rb") as inf:
-        scedecrypt(inf, sys.argv[2])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("filename", type=pathlib.Path)
+    parser.add_argument("outdir", type=pathlib.Path)
+    parser.add_argument("-keys", type=pathlib.Path, default="keys_external.py", required=False)
+    args = parser.parse_args()
+
+    use_keys(args.keys)
+
+    with open(args.filename, "rb") as inf:
+        scedecrypt(inf, args.outdir)

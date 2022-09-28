@@ -1,4 +1,7 @@
+from typing import Literal
 import struct
+import sys
+from importlib import import_module
 
 
 def _make_unpacker(fmt):
@@ -22,3 +25,6 @@ u64b = _make_unpacker(">Q")
 
 def c_str(data):
     return data[:data.find(b"\x00")].decode("utf8")
+
+def use_keys(name: Literal["keys_external.py", "keys_internal.py", "keys_proto.py"]):
+    sys.modules["keys"] = import_module(name.split(".")[0])

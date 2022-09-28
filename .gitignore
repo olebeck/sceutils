@@ -1,5 +1,9 @@
 .idea
+.vscode
 *.pyc
 env
 test/*
 PSP2UPDAT*
+*.elf
+*.bin
+*.PUP

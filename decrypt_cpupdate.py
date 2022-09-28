@@ -16,14 +16,15 @@ CpUp_Public = (0xA7CCAE0F501188527BF3DACCA3E231C8D8701E7B91927390701DE5E7A96327D
 FsImage_Public = (0xA9697F9D9343CADE68E04F9E356E6AB6BBC7DE36A4D81B98A83BC12BE3F6DF96ED7A64389456ACA933BEBFBA4FFEF05CF45F2F886F434FBBC3A01348533070C0B7D5E9C21EFE53E95A6019DB51C12C6BAFEB94E992287963448E59606384B99F3FF3E5EB6AA08BF32A4DBA7A312520CEC2B69BB20A6D0640B117170AA2DDA1FB590AEE7ADFC4E80DFCF27FA55DDEC92C07922FDD05AB1618DCB727AA6FF70027A9410BC845E50EAFD46C0FD92FF500672DE56489C669B0AA481FFD75E99E21A8DC2F9F9E87957B46BBF63FB7DDBE8B8CA861BA349A62458E855EE78C3DD6791F92E76422144E51295B1337E15C126DF6FA0C29321BC1D7C00E3C19EEF3A3E7A5, 0x10001)
 
 
-def decrypt_unpack_CpUp(filename: str, dst: str) -> tarfile.TarFile:
+def decrypt_unpack_cpup(filename: str, dst: str) -> tarfile.TarFile:
+    " decrypts a cpup into a tar "
     os.mkdir(dst)
     dst_name = os.path.join(dst, os.path.basename(filename) + ".tar.gz")
 
     with open(filename, "rb") as fin:
         data = decrypt(fin)
-    with open(dst_name, "wb") as fout:
-        fout.write(data)
+        with open(dst_name, "wb") as fout:
+            fout.write(data)
     try:
         tar = tarfile.open(fileobj=BytesIO(data), mode="r:gz")
     except tarfile.ReadError:
@@ -32,41 +33,45 @@ def decrypt_unpack_CpUp(filename: str, dst: str) -> tarfile.TarFile:
     return tar
 
 
-def extract_CpUp(tar: tarfile.TarFile, dst: str):
+def extract_cpup(tar: tarfile.TarFile, dst: str):
+    " extracts the cpup from the tar "
     os.mkdir(dst)
 
-    # need to skip some data
-    fsimage0 = tar.extractfile("./fsimage0.trf")
-    fsimage0.seek(0x120)
-    fsimage0 = fsimage0.read()
-    open(os.path.join(dst, "fsimage0.img"), "wb").write(fsimage0)
-    # read axfs for fsimage0
-    axfs_fsimage0 = axfs.axfs(BytesIO(fsimage0))
-    tar_fsimage0 = tarfile.open(os.path.join(dst, "fsimage0.tar"), mode="w")
-    axfs_fsimage0.toTar(0, tar_fsimage0)
-    tar_fsimage0.close()
+    # decrypt fsimage0
+    with tar.extractfile("./fsimage0.trf") as fsimage0:
+        fsimage0.seek(0x120)
+        with open(os.path.join(dst, "fsimage0.img"), "wb") as f:
+            f.write(fsimage0.read())
+
+        # read axfs for fsimage0
+        fsimage0.seek(0x120)
+        axfs_fsimage0 = axfs.AXFS(BytesIO(fsimage0))
+        with tarfile.open(os.path.join(dst, "fsimage0.tar"), mode="w") as tar_fsimage0:
+            axfs_fsimage0.toTar(0, tar_fsimage0)
 
     # decrypt fsimage1
-    fsimage1 = tar.extractfile("./fsimage1.trf")
-    fsimage1 = decrypt(fsimage1)
-    open(os.path.join(dst, "fsimage1.img"), "wb").write(fsimage1)
-    # read axfs for fsimage1
-    axfs_fsimage1 = axfs.axfs(BytesIO(fsimage1))
-    tar_fsimage1 = tarfile.open(os.path.join(dst, "fsimage1.tar"), mode="w")
-    axfs_fsimage1.toTar(0, tar_fsimage1)
-    tar_fsimage1.close()
+    with tar.extractfile("./fsimage1.trf") as fsimage1:
+        decrypted = decrypt(fsimage1)
+        with open(os.path.join(dst, "fsimage1.img"), "wb") as f:
+            f.write(decrypted)
+
+        # read axfs for fsimage1
+        axfs_fsimage1 = axfs.AXFS(BytesIO(decrypted))
+        with tarfile.open(os.path.join(dst, "fsimage1.tar"), mode="w") as tar_fsimage1:
+            axfs_fsimage1.toTar(0, tar_fsimage1)
 
     # decrypt vmlinux image
     vmlinux = tar.extractfile("./vmlinux.trf")
-    vmlinux = decrypt(vmlinux)
-    open(os.path.join(dst, "vmlinux.img"), "wb").write(vmlinux)
+    with open(os.path.join(dst, "vmlinux.img"), "wb") as f:
+        f.write(decrypt(vmlinux))
 
 
-def decrypt(f: IO[bytes], Silent=False):
-    Encrypted = True
+def decrypt(f: IO[bytes], silent=False):
+    " decrypts cpupdate "
+    is_encrypted = True
 
-    Magic, = struct.unpack("<I", f.read(4))
-    if Magic == CPUP_MAGIC:
+    magic, = struct.unpack("<I", f.read(4))
+    if magic == CPUP_MAGIC:
         (
             cp_version,
             fmt_version,
@@ -76,15 +81,15 @@ def decrypt(f: IO[bytes], Silent=False):
         ) = struct.unpack("<I8xIIII", f.read(28))
         rsa = RSA.construct(CpUp_Public)
 
-        Magic_str = int.to_bytes(Magic, 4, "big").decode("ascii")
+        magic_str = int.to_bytes(magic, 4, "big").decode("ascii")
         cp_ver_str = '.'.join([str(num) for num in int.to_bytes(cp_version, 4, "big")])
         fmt_ver_str = '.'.join([str(num) for num in int.to_bytes(fmt_version, 4, "big")])
-        if not Silent:
+        if not silent:
             print("CpUp Decrypt")
-            print(f"magic       : {Magic_str}\t\t(0x{Magic:08X})")
+            print(f"magic       : {magic_str}\t\t(0x{magic:08X})")
             print(f"cp version  : {cp_ver_str}\t\t(0x{cp_version:08X})")
             print(f"fmt version : {fmt_ver_str}\t\t(0x{fmt_version:08X})")
-    elif Magic == TRF_MAGIC:
+    elif magic == TRF_MAGIC:
         (
             version,
             data_size,
@@ -93,17 +98,17 @@ def decrypt(f: IO[bytes], Silent=False):
         ) = struct.unpack("<IIII", f.read(16))
         rsa = RSA.construct(FsImage_Public)
         if version == 0x1010100:
-            Encrypted = False
+            is_encrypted = False
 
         ver_str = '.'.join([str(num) for num in int.to_bytes(version, 4, "big")])
-        if not Silent:
+        if not silent:
             print("Trf Decrypt")
-            print(f"magic       : {Magic:08X}")
+            print(f"magic       : {magic:08X}")
             print(f"version     : {ver_str}\t\t(0x{version:08X})")
     else:
         raise RuntimeError("Invalid CpUp or trf")
 
-    if not Silent:
+    if not silent:
         print(f"size        : {size}\t\t(0x{size:08X})")
         print(f"data offset : {data_offset}\t\t(0x{data_offset:08X})")
         print(f"data size   : {data_size}\t\t(0x{data_size:08X})")
@@ -118,7 +123,7 @@ def decrypt(f: IO[bytes], Silent=False):
     # read file data and decrypt
     f.seek(data_offset, os.SEEK_SET)
     data = f.read((size - data_offset) - 0x100)
-    if Encrypted:
+    if is_encrypted:
         aes_key = AES.new(key, AES.MODE_CBC, iv)
         data = aes_key.decrypt(data)
 

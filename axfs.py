@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-from typing import IO
+import pathlib
+from typing import IO, Literal, Optional
 from dataclasses import dataclass
 from io import BytesIO
 import argparse
@@ -101,7 +102,7 @@ def loadRegion(f: IO, offset: int) -> axfs_region:
     return axfs_region(f)
 
 
-class axfs:
+class AXFS:
     def __init__(self, f: IO[bytes]):
         self.superblock = axfs_super_onmedia(*struct.unpack('>I16s40sI22Q4BQ', f.read(252)))
         assert self.superblock.signature == b'Advanced XIP FS\x00'
@@ -273,20 +274,30 @@ class axfs:
 
 
 def main():
+    class _args:
+        command: Literal["list", "tar"]
+        inputfile: pathlib.Path
+        output: Optional[pathlib.Path]
+
     parser = argparse.ArgumentParser()
     parser.add_argument("command", type=str, choices=["list", "tar"])
-    parser.add_argument("inputfile", help="input axfs image", type=str)
-    parser.add_argument("output", help="output file name for tar", type=str, nargs="*")  # optional
-    args = parser.parse_args()
+    parser.add_argument("inputfile", help="input axfs image", type=pathlib.Path)
+    parser.add_argument("output", help="output file name for tar", type=pathlib.Path, required=False)  # optional
+    args: _args = parser.parse_args()
 
-    fs = axfs(open(args.inputfile, "rb"))
+    inputfile = args.inputfile.as_posix()
+    output = args.output.as_posix() if args.output else None
+
+    with open(inputfile, "rb") as f:
+        fs = AXFS(f)
+
     if args.command == "list":
         fs.list(0)
         return
     elif args.command == "tar":
-        if not args.output:
-            args.output = args.inputfile + ".tar"
-        tar = tarfile.open(args.output, mode="w")
+        if not output:
+            output = inputfile + ".tar"
+        tar = tarfile.open(output, mode="w")
         fs.toTar(0, tar)
         tar.close()
         return

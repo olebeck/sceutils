@@ -2,6 +2,7 @@
 
 import os
 import sys
+from typing import IO
 import zlib
 import argparse
 import sceutils
@@ -10,8 +11,10 @@ from Crypto.Cipher import AES
 from Crypto.Util import Counter
 from importlib import import_module
 
+from util import use_keys
 
-def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_sysver=False):
+
+def self2elf(inf: IO[bytes], outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_sysver=False):
     npdrmtype = 0
     sce = SceHeader(inf.read(SceHeader.Size))
     if not silent:
@@ -126,7 +129,16 @@ def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_
 
 
 def main(args):
-    sys.modules["keys"] = import_module(args.keys.split(".")[0])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--inputfile", help="input file name", type=str, required=True)
+    parser.add_argument("-o", "--outputfile", help="output file name", type=str, required=True)
+    parser.add_argument("-k", "--keyriffile", help="NoNpdrm RIF file name", type=str)
+    parser.add_argument("-z", "--zrif", help="zrif string", type=str)
+    parser.add_argument("-K", "--keys", help="keys filename", type=str, default="keys_external.py")
+    args = parser.parse_args(args)
+    
+    use_keys(args.keys)
+    
     with open(args.inputfile, "rb") as inf:
         with open(args.outputfile, "wb") as outf:
             if args.keyriffile:
@@ -142,10 +154,5 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--inputfile", help="input file name", type=str, required=True)
-    parser.add_argument("-o", "--outputfile", help="output file name", type=str, required=True)
-    parser.add_argument("-k", "--keyriffile", help="NoNpdrm RIF file name", type=str)
-    parser.add_argument("-z", "--zrif", help="zrif string", type=str)
-    parser.add_argument("-K", "--keys", help="keys filename", type=str, default="keys_external.py")
-    main(parser.parse_args())
+    
+    main(sys.argv)

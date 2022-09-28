@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 
+import argparse
+import pathlib
 import struct
 from collections import defaultdict
-import os.path
+import os
 import glob
 import subprocess
 import sys
-from enum import IntEnum
-from importlib import import_module
+from typing import Optional
 
 from Crypto.Cipher import AES
 
-from util import u32, u8, c_str
+from util import u8, c_str, use_keys
 from scedecrypt import scedecrypt
 from self2elf import self2elf
-from decrypt_cpupdate import decrypt_unpack_CpUp, extract_CpUp
+from decrypt_cpupdate import decrypt_unpack_cpup, extract_cpup
+import pup_info
 
 unarzl_exe = os.path.join(os.path.dirname(os.path.realpath(__file__)), "unarzl", "unarzl")
 if not os.path.exists(unarzl_exe):
@@ -71,11 +73,6 @@ partitions = ["os0", "vs0", "sa0", "pd0"]
 g_typecount = defaultdict(int)
 
 
-class PupTarget(IntEnum):
-    TEST = 4
-    CEX = 2
-    DEX = 1
-
 
 def make_filename(hdr, filetype):
     magic, version, flags, moffs, metaoffs = struct.unpack("<IIIIQ", hdr[0:24])
@@ -91,23 +88,13 @@ def make_filename(hdr, filetype):
 
 def pup_extract_files(pup, output):
     with open(pup, "rb") as fin:
-        header = fin.read(SCEUF_HEADER_SIZE)
-        if header[0:5] != b"SCEUF":
+        header = pup_info.SCEUF.read(fin)
+        if header.magic[0:5] != b"SCEUF":
             print("Invalid PUP")
             return -1
+        header.print()
 
-        target = PupTarget(u32(header, 0x3c))
-        cnt = u32(header, 0x18)
-
-        print("-" * 80)
-        print(f"PUP Version: 0x{u32(header, 8):x}")
-        print(f"Firmware Version: 0x{u32(header, 0x10):08X}")
-        print(f"Build Number: {u32(header, 0x14)}")
-        print(f"Number of Files: {cnt}")
-        print(f"Target: {target.name}")
-        print("-" * 80)
-
-        for x in range(cnt):
+        for x in range(header.seg_num):
             fin.seek(SCEUF_HEADER_SIZE + x * SCEUF_FILEREC_SIZE)
             rec = fin.read(SCEUF_FILEREC_SIZE)
             filetype, offset, length, flags = struct.unpack("<QQQQ", rec)
@@ -123,11 +110,10 @@ def pup_extract_files(pup, output):
                 fin.seek(offset)
                 fout.write(fin.read(length))
             print(f"- {filename}")
-
         print("-" * 80)
 
 
-def join_files(mask, output):
+def join_files(mask: str, output: str):
     files = sorted(glob.glob(mask))
     if len(files) == 0:
         return
@@ -212,8 +198,7 @@ def decrypt_scewm(src, dst):
     aes = AES.new(SCEWM_KEY, AES.MODE_CBC, SCEWM_IV)
 
     with open(src, "rb") as fin:
-        fin.seek(0x20)
-        data = fin.read()
+        data = fin.read()[0x20:]
 
     with open(os.path.join(dst, os.path.basename(src)), "wb") as fout:
         dec = aes.decrypt(data)
@@ -222,7 +207,6 @@ def decrypt_scewm(src, dst):
 
 def decrypt_sceas(src, dst):
     if not os.path.exists(src):
-        print("Package doesnt have sceas, skipping")
         return
     with open(src, "rb") as fin:
         fin.seek(0x20)
@@ -345,23 +329,28 @@ def decrypt_os0(output):
 
 
 def decrypt_cpup(pup_dst, output):
-    for CpUp_path in glob.glob(os.path.join(pup_dst, "*.CpUp")) + glob.glob(os.path.join(output, "devkit_cp-*.pkg.seg02")):
-        if os.path.exists(CpUp_path):
-            print(f"Decrypting {os.path.basename(CpUp_path)}")
-            print("-" * 80)
-            output_name = os.path.splitext(os.path.basename(CpUp_path))[0]
-            output_path = os.path.join(output, output_name)
+    CpUp = glob.glob(os.path.join(pup_dst, "*.CpUp"))
+    seg = glob.glob(os.path.join(output, "devkit_cp-*.pkg.seg02"))
+    for path in CpUp + seg:
+        output_name = os.path.splitext(os.path.basename(path))[0]
+        output_path = os.path.join(output, output_name)
 
-            tar = decrypt_unpack_CpUp(CpUp_path, output_path)
-            if not tar:
-                continue
-            try:
-                extract_CpUp(tar, os.path.join(output_path, "dec"))
-            except Exception as e:
-                print("Exception while extracting fsimages", e)
+        print(f"Decrypting {output_name}")
+        print("-" * 80)
+
+        tar = decrypt_unpack_cpup(path, output_path)
+        if not tar:
+            continue
+        try:
+            dst = os.path.join(output_path, "dec")
+            extract_cpup(tar, dst)
+        except Exception as e:
+            print("Exception while extracting fsimages", e)
 
 
 def extract_pup(pup, output):
+    global g_typecount # reset every run
+    g_typecount = defaultdict(int)
     if os.path.exists(output):
         print(f"{output} already exists, remove it first")
         return
@@ -402,15 +391,21 @@ def extract_pup(pup, output):
     decrypt_os0(output)
 
 
-def main(argv):
-    if len(argv) != 4:
-        print("Usage: ./pup_fiction.py FILE.PUP output-dir/ keys_file.py")
-        return 1
-    # module magic to make "import keys" work without it existing
-    sys.modules["keys"] = import_module(argv[3].split(".")[0])
+def main(args):
+    class _args:
+        PUP: pathlib.Path
+        output: pathlib.Path
+        keys: Optional[pathlib.Path]
 
-    extract_pup(argv[1], argv[2])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("PUP", type=pathlib.Path)
+    parser.add_argument("output", type=pathlib.Path)
+    parser.add_argument("-keys", type=pathlib.Path, default=pathlib.Path("./keys_external.py"), required=False)
+    args: _args = parser.parse_args(args)
+
+    use_keys(args.keys.as_posix())
+    extract_pup(args.PUP.as_posix(), args.output.as_posix())
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])
