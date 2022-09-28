@@ -151,18 +151,20 @@ def main(fname: str):
 
             if length != p.size:
                 print(f'output {name} is truncated ({100*length/p.size:.2f}% dumped)')
-            
+
             if p.code in (EmmcPartitionCode.OS0, EmmcPartitionCode.VS0):
                 print(f"Extracting {partition_name}")
                 partition_out = os.path.join(base, "fs", partition_name)
                 subprocess.call(["7z", "x", partition_image_name, f"-o{partition_out}"])
 
-                
                 partition_dec_out = os.path.join(base, "fs_dec", partition_name)
                 pup_fiction.decrypt_selfs(partition_out, partition_dec_out)
 
                 if p.code == EmmcPartitionCode.OS0:
                     pup_fiction.decrypt_os0(base)
+                    bootimage_out = partition_dec_out+"/kd/bootimage"
+                    os.makedirs(bootimage_out, exist_ok=True)
+                    pup_fiction.extract_bootimage(partition_dec_out+"/kd/bootimage.elf", bootimage_out)
 
     finally:
         emmc.close()

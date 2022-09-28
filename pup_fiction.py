@@ -12,7 +12,7 @@ from typing import Optional
 
 from Crypto.Cipher import AES
 
-from util import u8, c_str, use_keys
+from util import u8, u32, c_str, use_keys
 from scedecrypt import scedecrypt
 from self2elf import self2elf
 from decrypt_cpupdate import decrypt_unpack_cpup, extract_cpup
@@ -350,6 +350,30 @@ def decrypt_cpup(pup_dst, output):
             print("Exception while extracting fsimages", e)
 
 
+def extract_bootimage(filename: str, output: str):
+    with open(filename, "rb") as f:
+        data = f.read()
+
+    data = data[data.find(b"SceKernelBootimage") - 4:]
+    base_va = 0x81000000
+    off = u32(data, 0xCC) - base_va
+    num = u32(data, off)
+
+    for x in range(num):
+        entry_off = off + 8 + 12 * x
+
+        name_off = u32(data, entry_off) - base_va
+        name = c_str(data[name_off:name_off + 0x100])
+        basename = name[name.rfind("/") + 1:]
+        start = u32(data, entry_off + 4) - base_va
+        size = u32(data, entry_off + 8)
+
+        print(f"Writing {name}...")
+        mod = data[start:start + size]
+        with open(os.path.join(output, basename), "wb") as fout:
+            fout.write(mod)
+
+
 def extract_pup(pup, output):
     global g_typecount # reset every run
     g_typecount = defaultdict(int)
@@ -387,6 +411,9 @@ def extract_pup(pup, output):
         print("couldnt find boot_slb2-00.pkg.seg02")
 
     extract_fs(output)
+
+    kd_folder = output+"/fs_dec/os0/kd"
+    extract_bootimage(kd_folder+"/bootimage.elf", kd_folder+"/bootimage")
 
     os.mkdir(os.path.join(output, "fs_dec"))
     decrypt_fs(output)
