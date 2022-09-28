@@ -45,7 +45,7 @@ def extract_cpup(tar: tarfile.TarFile, dst: str):
 
         # read axfs for fsimage0
         fsimage0.seek(0x120)
-        axfs_fsimage0 = axfs.AXFS(BytesIO(fsimage0))
+        axfs_fsimage0 = axfs.AXFS(fsimage0)
         with tarfile.open(os.path.join(dst, "fsimage0.tar"), mode="w") as tar_fsimage0:
             axfs_fsimage0.toTar(0, tar_fsimage0)
 

@@ -61,15 +61,14 @@ class EmmcPartition:
         self.type = EmmcPartitionType(type)
 
     def __str__(self):
-        str = ''
-        str += 'EmmcPartition:\n'
-        str += 'Offset (bytes):   0x{:X}\n'.format(self.offset)
-        str += 'Size (bytes):     0x{:X} ({})\n'.format(self.size, sizeof_fmt(self.size))
-        str += 'Code:             {}\n'.format(self.code)
-        str += 'Type:             {}\n'.format(self.type)
-        str += 'Active:           {}\n'.format(self.active)
-        str += 'Flags:            0x{:08X}\n'.format(self.flags)
-        return str
+        ret =  'EmmcPartition:\n'
+        ret += f'Offset (bytes):   0x{self.offset:X}\n'
+        ret += f'Size (bytes):     0x{self.size:X} ({sizeof_fmt(self.size)})\n'
+        ret += f'Code:             {self.code}\n'
+        ret += f'Type:             {self.type}\n'
+        ret += f'Active:           {self.active}\n'
+        ret += f'Flags:            0x{self.flags:08X}\n'
+        return ret
 
 class EmmcMasterBlock:
     Size = 0x200
@@ -99,13 +98,13 @@ class EmmcMasterBlock:
 
     def __str__(self):
         ret =  'EmmcMasterBlock:\n'
-        ret += 'Magic:          {}\n'.format(self.magic)
-        ret += 'Version:        {}\n'.format(self.version)
-        ret += 'Size (bytes):   0x{:X} ({})\n'.format(self.size, sizeof_fmt(self.size))
+        ret += f'Magic:          {self.magic}\n'
+        ret += f'Version:        {self.version}\n'.format()
+        ret += f'Size (bytes):   0x{self.size:X} ({sizeof_fmt(self.size)})\n'
         ret += 'Partitions:\n'
 
         for p in self.partitions:
-            ret += '{}\n'.format(p)
+            ret += f'{p}\n'
 
         return ret
 

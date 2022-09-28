@@ -135,6 +135,7 @@ class KeyStore:
         for item in self._store[keytype][scetype][selftype]:
             if (sysver < 0 or (sysver >= item.minver and sysver <= item.maxver)) and (keyrev < 0 or keyrev == item.keyrev):
                 return (item.key, item.iv)
+        print(f"{keytype=} {scetype=} {sysver=} {keyrev=} {selftype}")
         raise KeyError("Cannot find key/iv for this SCE file")
 
 

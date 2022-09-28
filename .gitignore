@@ -7,3 +7,8 @@ PSP2UPDAT*
 *.elf
 *.bin
 *.PUP
+
+PUP/
+PUP_dec/
+fs/
+fs_dec/

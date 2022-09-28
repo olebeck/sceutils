@@ -213,12 +213,14 @@ def decrypt_sceas(src, dst):
     with open(src, "rb") as fin:
         fin.seek(0x20)
         data = fin.read()
-
-    from keys import SCEAS_KEY, SCEAS_IV
-    aes = AES.new(SCEAS_KEY, AES.MODE_CBC, SCEAS_IV)
-    with open(os.path.join(dst, os.path.basename(src)), "wb") as fout:
-        fout.write(aes.decrypt(data))
-    print(f"Decrypted: {os.path.basename(src)}")
+    try:
+        from keys import SCEAS_KEY, SCEAS_IV
+        aes = AES.new(SCEAS_KEY, AES.MODE_CBC, SCEAS_IV)
+        with open(os.path.join(dst, os.path.basename(src)), "wb") as fout:
+            fout.write(aes.decrypt(data))
+        print(f"Decrypted: {os.path.basename(src)}")
+    except ImportError:
+        print("Dont have SCEAS keys")
 
 
 def slb2_decrypt(src, dst):
@@ -412,12 +414,14 @@ def extract_pup(pup, output):
 
     extract_fs(output)
 
-    kd_folder = output+"/fs_dec/os0/kd"
-    extract_bootimage(kd_folder+"/bootimage.elf", kd_folder+"/bootimage")
-
     os.mkdir(os.path.join(output, "fs_dec"))
     decrypt_fs(output)
     decrypt_os0(output)
+
+    kd_folder = output+"/fs_dec/os0/kd"
+    bootimage_out = kd_folder+"/bootimage"
+    os.makedirs(bootimage_out, exist_ok=True)
+    extract_bootimage(kd_folder+"/bootimage.elf", bootimage_out)
 
 
 def main(args):
