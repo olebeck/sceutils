@@ -7,8 +7,8 @@ import struct, sys, itertools
 import subprocess
 from enum import Enum
 import zipfile
-import pup_fiction
 
+DO_EXTRACT = True
 EMMC_BLOCK_SIZE = 512
 
 class EmmcPartitionCode(Enum):
@@ -151,7 +151,7 @@ def main(fname: str):
             if length != p.size:
                 print(f'output {name} is truncated ({100*length/p.size:.2f}% dumped)')
 
-            if p.code in (EmmcPartitionCode.OS0, EmmcPartitionCode.VS0):
+            if p.code in (EmmcPartitionCode.OS0, EmmcPartitionCode.VS0) and DO_EXTRACT:
                 print(f"Extracting {partition_name}")
                 partition_out = os.path.join(base, "fs", partition_name)
                 subprocess.call(["7z", "x", partition_image_name, f"-o{partition_out}"])
@@ -172,6 +172,7 @@ def main(fname: str):
 if __name__ == "__main__":
     fname_arg = sys.argv[1]
     if len(sys.argv) > 2:
+        import pup_fiction
         pup_fiction.use_keys(sys.argv[2])
 
     if os.path.isdir(fname_arg):
