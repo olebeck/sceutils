@@ -19,6 +19,8 @@ from decrypt_cpupdate import decrypt_unpack_cpup, extract_cpup
 import pup_info
 
 unarzl_exe = os.path.join(os.path.dirname(os.path.realpath(__file__)), "unarzl", "unarzl")
+if sys.platform == "win32":
+    unarzl_exe += ".exe"
 if not os.path.exists(unarzl_exe):
     print("Please cd to unarzl and type make")
     sys.exit(-1)
