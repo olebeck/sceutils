@@ -2,7 +2,7 @@ import sys
 import pup_info
 
 
-BLOCKSIZE = int(100e6)
+BLOCKSIZE = int(10e6)
 
 if __name__ == "__main__":
     filename = sys.argv[1]
@@ -20,9 +20,10 @@ if __name__ == "__main__":
                 before = f.tell()
                 real_index = before - BLOCKSIZE + index
                 print(f"at 0x{real_index:x}")
-                
+
                 f.seek(real_index)
                 info = pup_info.SCEUF.read(f)
+                print(info)
                 info.print()
                 yn = input("extract?")
                 if yn != "y":
@@ -31,7 +32,6 @@ if __name__ == "__main__":
                 else:
                     f.seek(real_index)
                     pup = f.read(info.data_len)
-                    with open(f"PSP2_{info.version:x}_{real_index:x}.PUP", "wb") as fo:
+                    with open(f"PSP2_{info.version:x}_{info.build_no}_{real_index:x}.PUP", "wb") as fo:
                         fo.write(pup)
                     print("written pup")
-

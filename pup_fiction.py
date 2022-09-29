@@ -12,7 +12,7 @@ from typing import Optional
 
 from Crypto.Cipher import AES
 
-from util import u8, u32, c_str, use_keys
+from util import u8, u32, c_str, use_keys, make_filename
 from scedecrypt import scedecrypt
 from self2elf import self2elf
 from decrypt_cpupdate import decrypt_unpack_cpup, extract_cpup
@@ -25,67 +25,10 @@ if not os.path.exists(unarzl_exe):
     print("Please cd to unarzl and type make")
     sys.exit(-1)
 
-SCEUF_HEADER_SIZE = 0x80
-SCEUF_FILEREC_SIZE = 0x20
-
-pup_types = {
-    0x100: "version.txt",
-    0x101: "license.xml",
-    0x200: "psp2swu.self",
-    0x204: "cui_setupper.self",
-    0x400: "package_scewm.wm",
-    0x401: "package_sceas.as",
-    0x2005: "UpdaterES1.CpUp",
-    0x2006: "UpdaterES2.CpUp",
-}
-
-FSTYPE = [
-    "unknown0",
-    "os0",
-    "unknown2",
-    "unknown3",
-    "vs0_chmod",
-    "unknown5",
-    "unknown6",
-    "unknown7",
-    "pervasive8",
-    "boot_slb2",
-    "vs0",
-    "devkit_cp",
-    "motionC",
-    "bbmc",
-    "unknownE",
-    "motionF",
-    "touch10",
-    "touch11",
-    "syscon12",
-    "syscon13",
-    "pervasive14",
-    "unknown15",
-    "vs0_tarpatch",
-    "sa0",
-    "pd0",
-    "pervasive19",
-    "unknown1A",
-    "psp_emulist",
-]
 
 partitions = ["os0", "vs0", "sa0", "pd0"]
 
 g_typecount = defaultdict(int)
-
-
-
-def make_filename(hdr, filetype):
-    magic, version, flags, moffs, metaoffs = struct.unpack("<IIIIQ", hdr[0:24])
-    if magic == 0x454353 and version == 3 and flags == 0x30040:
-        meta = hdr[metaoffs:]
-        t = u8(meta, 4)
-        if t < 0x1C:
-            name = f"{FSTYPE[t]}-{g_typecount[t]:02}.pkg"
-            g_typecount[t] += 1
-            return name
-    return f"unknown-0x{filetype:x}.pkg"
 
 
 def pup_extract_files(pup, output):
@@ -97,15 +40,15 @@ def pup_extract_files(pup, output):
         header.print()
 
         for x in range(header.seg_num):
-            fin.seek(SCEUF_HEADER_SIZE + x * SCEUF_FILEREC_SIZE)
-            rec = fin.read(SCEUF_FILEREC_SIZE)
+            fin.seek(pup_info.SCEUF_HEADER_SIZE + x * pup_info.SCEUF_FILEREC_SIZE)
+            rec = fin.read(pup_info.SCEUF_FILEREC_SIZE)
             filetype, offset, length, flags = struct.unpack("<QQQQ", rec)
 
-            filename = pup_types.get(filetype)
+            filename = pup_info.pup_types.get(filetype)
             if not filename:
                 fin.seek(offset)
                 hdr = fin.read(0x1000)
-                filename = make_filename(hdr, filetype)
+                filename = make_filename(hdr, filetype, g_typecount)
             # print("filename {filename} type {filetype} offset {offset:x} length {length:x} flags {flags:x}")
 
             with open(os.path.join(output, filename), "wb") as fout:

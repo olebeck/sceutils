@@ -1,11 +1,25 @@
 #!/usr/bin/env python3
 
+from collections import defaultdict
 from dataclasses import dataclass
 import struct, enum
 from typing import IO
 
+from util import make_filename
+
 def s_read(format, f):
     return struct.unpack(format, f.read(struct.calcsize(format)))
+
+pup_types = {
+    0x100: "version.txt",
+    0x101: "license.xml",
+    0x200: "psp2swu.self",
+    0x204: "cui_setupper.self",
+    0x400: "package_scewm.wm",
+    0x401: "package_sceas.as",
+    0x2005: "UpdaterES1.CpUp",
+    0x2006: "UpdaterES2.CpUp",
+}
 
 
 class PupTarget(enum.IntEnum):
@@ -14,6 +28,7 @@ class PupTarget(enum.IntEnum):
     DEX = 1
 
 SCEUF_HEADER_SIZE = 0x80
+SCEUF_FILEREC_SIZE = 0x20
 @dataclass
 class SCEUF:
     magic: bytes #char[7]
@@ -50,6 +65,7 @@ class SCEUF:
         print(f"Target: {self.target.name}")
         print("-" * 80)
 
+g_typecount = defaultdict(int)
 
 
 def print_info(name: str):
@@ -57,6 +73,20 @@ def print_info(name: str):
         header = SCEUF.read(f)
         header.print()
 
+        for x in range(header.seg_num):
+            f.seek(SCEUF_HEADER_SIZE + x * SCEUF_HEADER_SIZE)
+            rec = f.read(SCEUF_FILEREC_SIZE)
+            filetype, offset, length, flags = struct.unpack("<QQQQ", rec)
+            filename = pup_types.get(filetype)
+
+            print(offset)
+
+            if not filename:
+                f.seek(offset)
+                hdr = f.read(0x1000)
+                filename = make_filename(hdr, filetype, g_typecount)
+
+            print(f"{filename=} {filetype=} {offset=:x} {length=:x} {flags=:x}")
 
 if __name__ == "__main__":
     import sys

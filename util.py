@@ -31,3 +31,48 @@ def use_keys(name: Literal["keys_external.py", "keys_internal.py", "keys_proto.p
     mod_name = os.path.basename(name).split(".")[0]
     sys.path.append(os.path.dirname(name))
     sys.modules["keys"] = import_module(mod_name)
+
+
+
+
+FSTYPE = [
+    "unknown0",
+    "os0",
+    "unknown2",
+    "unknown3",
+    "vs0_chmod",
+    "unknown5",
+    "unknown6",
+    "unknown7",
+    "pervasive8",
+    "boot_slb2",
+    "vs0",
+    "devkit_cp",
+    "motionC",
+    "bbmc",
+    "unknownE",
+    "motionF",
+    "touch10",
+    "touch11",
+    "syscon12",
+    "syscon13",
+    "pervasive14",
+    "unknown15",
+    "vs0_tarpatch",
+    "sa0",
+    "pd0",
+    "pervasive19",
+    "unknown1A",
+    "psp_emulist",
+]
+
+def make_filename(hdr, filetype, g_typecount):
+    magic, version, flags, moffs, metaoffs = struct.unpack("<IIIIQ", hdr[0:24])
+    if magic == 0x454353 and version == 3 and flags == 0x30040:
+        meta = hdr[metaoffs:]
+        t = u8(meta, 4)
+        if t < 0x1C:
+            name = f"{FSTYPE[t]}-{g_typecount[t]:02}.pkg"
+            g_typecount[t] += 1
+            return name
+    return f"unknown-0x{filetype:x}.pkg"
