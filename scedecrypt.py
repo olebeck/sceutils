@@ -9,7 +9,6 @@ import sceutils
 from scetypes import SceHeader
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
-from importlib import import_module
 
 from util import use_keys
 

@@ -74,12 +74,10 @@ def print_info(name: str):
         header.print()
 
         for x in range(header.seg_num):
-            f.seek(SCEUF_HEADER_SIZE + x * SCEUF_HEADER_SIZE)
+            f.seek(SCEUF_HEADER_SIZE + x * SCEUF_FILEREC_SIZE)
             rec = f.read(SCEUF_FILEREC_SIZE)
             filetype, offset, length, flags = struct.unpack("<QQQQ", rec)
             filename = pup_types.get(filetype)
-
-            print(offset)
 
             if not filename:
                 f.seek(offset)

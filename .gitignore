@@ -7,6 +7,9 @@ PSP2UPDAT*
 *.elf
 *.bin
 *.PUP
+*.pkg
+*.self
+*.seg02
 
 PUP/
 PUP_dec/

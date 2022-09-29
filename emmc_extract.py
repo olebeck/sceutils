@@ -8,7 +8,7 @@ import subprocess
 from enum import Enum
 import zipfile
 
-DO_EXTRACT = True
+DO_EXTRACT = False
 EMMC_BLOCK_SIZE = 512
 
 class EmmcPartitionCode(Enum):
@@ -131,25 +131,22 @@ def main(fname: str):
             partition_image_name = f"{base}/{name}"
             print(f'extracting {partition_image_name}... ')
 
-            if os.path.exists(partition_image_name):
-                print("skip, exists")
-                continue
+            if not os.path.exists(partition_image_name):
+                with open(partition_image_name, "wb") as f:
+                    emmc.seek(p.offset)
+                    length = 0
 
-            with open(partition_image_name, "wb") as f:
-                emmc.seek(p.offset)
-                length = 0
+                    while length != p.size:
+                        data = emmc.read(min(p.size - length, int(100e6)))
+                        if len(data) == 0 or data is None:
+                            break
 
-                while length != p.size:
-                    data = emmc.read(min(p.size - length, int(100e6)))
-                    if len(data) == 0 or data is None:
-                        break
+                        f.write(data)
+                        length += len(data)
+                        print(f'{100*length/p.size:.2f}%... ')
 
-                    f.write(data)
-                    length += len(data)
-                    print(f'{100*length/p.size:.2f}%... ')
-
-            if length != p.size:
-                print(f'output {name} is truncated ({100*length/p.size:.2f}% dumped)')
+                if length != p.size:
+                    print(f'output {name} is truncated ({100*length/p.size:.2f}% dumped)')
 
             if p.code in (EmmcPartitionCode.OS0, EmmcPartitionCode.VS0) and DO_EXTRACT:
                 print(f"Extracting {partition_name}")
@@ -174,6 +171,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         import pup_fiction
         pup_fiction.use_keys(sys.argv[2])
+        DO_EXTRACT = True
 
     if os.path.isdir(fname_arg):
         for zipname in glob(fname_arg+"/*/*.zip"):

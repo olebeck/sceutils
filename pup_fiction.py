@@ -49,12 +49,12 @@ def pup_extract_files(pup, output):
                 fin.seek(offset)
                 hdr = fin.read(0x1000)
                 filename = make_filename(hdr, filetype, g_typecount)
-            # print("filename {filename} type {filetype} offset {offset:x} length {length:x} flags {flags:x}")
+            print(f"{filename=} {filetype=} {offset=:x} {length=:x} {flags=:x}")
 
             with open(os.path.join(output, filename), "wb") as fout:
                 fin.seek(offset)
                 fout.write(fin.read(length))
-            print(f"- {filename}")
+            #print(f"- {filename}")
         print("-" * 80)
 
 
