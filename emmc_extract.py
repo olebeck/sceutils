@@ -161,6 +161,15 @@ def main(fname: str):
                     bootimage_out = partition_dec_out+"/kd/bootimage"
                     os.makedirs(bootimage_out, exist_ok=True)
                     pup_fiction.extract_bootimage(partition_dec_out+"/kd/bootimage.elf", bootimage_out)
+                
+            if p.code == EmmcPartitionCode.SLB2 and DO_EXTRACT:
+                slb2_out = os.path.join(base, "SLB2")
+                os.makedirs(slb2_out, exist_ok=True)
+                pup_fiction.slb2_extract(partition_image_name, slb2_out)
+
+                slb2_dec_out = os.path.join(base, "SLB2_dec")
+                os.makedirs(slb2_dec_out, exist_ok=True)
+                pup_fiction.slb2_decrypt(slb2_out, slb2_dec_out)
 
     finally:
         emmc.close()
