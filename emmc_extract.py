@@ -8,7 +8,7 @@ import subprocess
 from enum import Enum
 import zipfile
 
-DO_EXTRACT = False
+DO_EXTRACT = True
 EMMC_BLOCK_SIZE = 512
 
 class EmmcPartitionCode(Enum):
@@ -151,25 +151,46 @@ def main(fname: str):
             if p.code in (EmmcPartitionCode.OS0, EmmcPartitionCode.VS0) and DO_EXTRACT:
                 print(f"Extracting {partition_name}")
                 partition_out = os.path.join(base, "fs", partition_name)
-                subprocess.call(["7z", "x", partition_image_name, f"-o{partition_out}"])
+                if not os.path.exists(partition_out):
+                    subprocess.call(["7z", "x", partition_image_name, f"-o{partition_out}"])
 
                 partition_dec_out = os.path.join(base, "fs_dec", partition_name)
-                pup_fiction.decrypt_selfs(partition_out, partition_dec_out)
+                if not os.path.exists(partition_dec_out):
+                    print("Decryping selfs")
+                    pup_fiction.decrypt_selfs(partition_out, partition_dec_out)
 
                 if p.code == EmmcPartitionCode.OS0:
-                    pup_fiction.decrypt_os0(base)
-                    bootimage_out = partition_dec_out+"/kd/bootimage"
-                    os.makedirs(bootimage_out, exist_ok=True)
-                    pup_fiction.extract_bootimage(partition_dec_out+"/kd/bootimage.elf", bootimage_out)
-                
-            if p.code == EmmcPartitionCode.SLB2 and DO_EXTRACT:
-                slb2_out = os.path.join(base, "SLB2")
-                os.makedirs(slb2_out, exist_ok=True)
-                pup_fiction.slb2_extract(partition_image_name, slb2_out)
+                    if not os.path.exists(partition_dec_out):
+                        print("decrypting os0")
+                        pup_fiction.decrypt_os0(base)
 
-                slb2_dec_out = os.path.join(base, "SLB2_dec")
-                os.makedirs(slb2_dec_out, exist_ok=True)
-                pup_fiction.slb2_decrypt(slb2_out, slb2_dec_out)
+                    try:
+                        bootimage_out = partition_dec_out+"/kd/bootimage"
+                        if not os.path.exists(bootimage_out):
+                            print("decrypting bootimage")
+                            os.makedirs(bootimage_out, exist_ok=True)
+                            pup_fiction.extract_bootimage(partition_dec_out+"/kd/bootimage.elf", bootimage_out)
+                    except Exception as e:
+                        print("error extracting bootimage")
+                        print(e)
+
+            if p.code == EmmcPartitionCode.SLB2 and DO_EXTRACT:
+                slb2_out = os.path.join(base, partition_name)
+                if not os.path.exists(slb2_out):
+                    print("extracting slb2")
+                    os.makedirs(slb2_out, exist_ok=True)
+                    pup_fiction.slb2_extract(partition_image_name, slb2_out)
+
+                slb2_dec_out = os.path.join(base, partition_name+"_dec")
+                if not os.path.exists(slb2_dec_out):
+                    print("decrypting slb2")
+                    os.makedirs(slb2_dec_out, exist_ok=True)
+                    try:
+                        pup_fiction.slb2_decrypt(slb2_out, slb2_dec_out)
+                    except KeyError as e:
+                        with open(slb2_dec_out+"/error.txt", "w", encoding="utf8") as f:
+                            f.write(str(e))
+                        print(e)
 
     finally:
         emmc.close()
@@ -187,5 +208,8 @@ if __name__ == "__main__":
             zipname = zipname.replace("\\","/")
             print(zipname)
             main(zipname)
+        for imgname in glob(fname_arg+"/*/*.img"):
+            print(imgname)
+            main(imgname)
     else:
         main(fname_arg)
