@@ -20,7 +20,7 @@ def print_metadata_keyvault(keys):
         print(f'  {i:#0{4}x}:      {b2a_hex(key)}')
 
 
-def get_segments(inf, sce_hdr, sysver=-1, self_type=SelfType.NONE, keytype=0, klictxt=b"0", silent=False) -> dict[int, SceSegment]:
+def get_segments(inf, sce_hdr, sysver=-1, self_type=SelfType.NONE, keytype=0, klictxt=b"\0"*16, silent=False) -> dict[int, SceSegment]:
     from keys import SCE_KEYS
     inf.seek(sce_hdr.metadata_offset + 48)
     dat = inf.read(sce_hdr.header_length - sce_hdr.metadata_offset - 48)

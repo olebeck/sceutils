@@ -13,7 +13,7 @@ from Crypto.Util import Counter
 from util import use_keys
 
 
-def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt='0', silent=False, ignore_sysver=False):
+def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, silent=False, ignore_sysver=False):
     npdrmtype = 0
 
     sce = SceHeader(inf.read(SceHeader.Size))
@@ -63,10 +63,13 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt='0', silent=Fa
     # copy elf header
     inf.seek(self_hdr.elf_offset)
     dat = inf.read(ElfHeader.Size)
-    outf.write(dat)
     elf_hdr = ElfHeader(dat)
     if not silent:
         print(elf_hdr)
+    if elf_hdr.e_machine == 0xf00d:
+        elf_hdr.e_shnum = 0
+        elf_hdr.e_shoff = 0
+    outf.write(elf_hdr.pack())
 
     # get segments
     elf_phdrs = {}
@@ -164,7 +167,7 @@ def main(args):
                 lic = SceRIF(rif)
                 self2elf(inf, outf, lic.klicense)
             else:
-                self2elf(inf, outf, b"0")
+                self2elf(inf, outf)
 
 
 if __name__ == "__main__":

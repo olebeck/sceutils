@@ -220,8 +220,8 @@ class ElfHeader:
 
     def __init__(self, data):
         (
-            e_ident_1,
-            e_ident_2,
+            self.e_ident_1,
+            self.e_ident_2,
             self.e_type,
             self.e_machine,
             self.e_version,
@@ -236,19 +236,41 @@ class ElfHeader:
             self.e_shnum,
             self.e_shstrndx
         ) = struct.unpack('<QQHHIIIIIHHHHHH', data)
-        if e_ident_1 != 0x10101464C457F:
+        if self.e_ident_1 != 0x10101464C457F:
             raise TypeError('Unknown ELF e_ident')
         if self.e_machine != 0x28 and self.e_machine != 0xF00D:
             raise TypeError('Unknown ELF e_machine')
         if self.e_version != 0x1:
             raise TypeError('Unknown ELF e_version')
+    
+    def pack(self) -> bytes:
+        return struct.pack('<QQHHIIIIIHHHHHH',
+            self.e_ident_1,
+            self.e_ident_2,
+            self.e_type,
+            self.e_machine,
+            self.e_version,
+            self.e_entry,
+            self.e_phoff,
+            self.e_shoff,
+            self.e_flags,
+            self.e_ehsize,
+            self.e_phentsize,
+            self.e_phnum,
+            self.e_shentsize,
+            self.e_shnum,
+            self.e_shstrndx
+        )
 
     def __str__(self):
         ret = ''
         ret += 'ELF Header:\n'
         ret += f' e_machine:        {"ARM" if self.e_machine == 0x28 else "MeP"}\n'
         ret += f' e_entry:          0x{self.e_entry:X}\n'
-        ret += f' e_phnum:          {self.e_phnum}'
+        ret += f' e_phoff:          0x{self.e_phoff:X}\n'
+        ret += f' e_phnum:          {self.e_phnum}\n'
+        ret += f' e_shoff:          0x{self.e_shoff:X}\n'
+        ret += f' e_shnum:          {self.e_shnum}'
         return ret
 
 
