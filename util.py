@@ -66,13 +66,13 @@ FSTYPE = [
     "psp_emulist",
 ]
 
-def make_filename(hdr, filetype, g_typecount):
+def make_filename(hdr, filetype, typecount):
     magic, version, flags, moffs, metaoffs = struct.unpack("<IIIIQ", hdr[0:24])
     if magic == 0x454353 and version == 3 and flags == 0x30040:
         meta = hdr[metaoffs:]
         t = u8(meta, 4)
         if t < 0x1C:
-            name = f"{FSTYPE[t]}-{g_typecount[t]:02}.pkg"
-            g_typecount[t] += 1
+            name = f"{FSTYPE[t]}-{typecount[t]:02}.pkg"
+            typecount[t] += 1
             return name
     return f"unknown-0x{filetype:x}.pkg"

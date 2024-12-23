@@ -18,6 +18,9 @@ from self2elf import self2elf
 from decrypt_cpupdate import decrypt_unpack_cpup, extract_cpup
 import pup_info
 
+partitions = ["os0", "vs0", "sa0", "pd0"]
+
+
 unarzl_exe = os.path.join(os.path.dirname(os.path.realpath(__file__)), "unarzl", "unarzl")
 if sys.platform == "win32":
     unarzl_exe += ".exe"
@@ -26,12 +29,13 @@ if not os.path.exists(unarzl_exe):
     sys.exit(-1)
 
 
-partitions = ["os0", "vs0", "sa0", "pd0"]
+def unarzl(src: str, dst: str):
+    subprocess.call([unarzl_exe, src, dst])
 
-g_typecount = defaultdict(int)
 
+def pup_extract_files(pup: str, output: str):
+    typecount = defaultdict(int)
 
-def pup_extract_files(pup, output):
     with open(pup, "rb") as fin:
         header = pup_info.SCEUF.read(fin)
         if header.magic[0:5] != b"SCEUF":
@@ -48,13 +52,12 @@ def pup_extract_files(pup, output):
             if not filename:
                 fin.seek(offset)
                 hdr = fin.read(0x1000)
-                filename = make_filename(hdr, filetype, g_typecount)
+                filename = make_filename(hdr, filetype, typecount)
             print(f"{filename=} {filetype=} {offset=:x} {length=:x} {flags=:x}")
 
             with open(os.path.join(output, filename), "wb") as fout:
                 fin.seek(offset)
                 fout.write(fin.read(length))
-            #print(f"- {filename}")
         print("-" * 80)
 
 
@@ -69,8 +72,8 @@ def join_files(mask: str, output: str):
             os.remove(filename)
 
 
-def pup_decrypt_packages(src, dst):
-    files = list(map(os.path.basename, glob.glob(os.path.join(src, "*.pkg"))))
+def pup_decrypt_packages(src: str, dst: str):
+    files = [os.path.basename(p) for p in glob.glob(os.path.join(src, "*.pkg"))]
     files.sort()
 
     for filename in files:
@@ -92,8 +95,8 @@ def pup_decrypt_packages(src, dst):
                 except KeyError:
                     print(f"[!] Couldn't decrypt {filename}")
 
-    for pkg in partitions:
-        join_files(os.path.join(dst, f"{pkg}-*.pkg.seg02"), os.path.join(dst, f"{pkg}.bin"))
+    for partition in partitions:
+        join_files(os.path.join(dst, f"{partition}-*.pkg.seg02"), os.path.join(dst, f"{partition}.bin"))
 
     print("-" * 80)
 
@@ -320,8 +323,6 @@ def extract_bootimage(filename: str, output: str):
 
 
 def extract_pup(pup, output):
-    global g_typecount # reset every run
-    g_typecount = defaultdict(int)
     if os.path.exists(output):
         print(f"{output} already exists, remove it first")
         return
@@ -341,7 +342,10 @@ def extract_pup(pup, output):
     decrypt_scewm(os.path.join(pup_dst, "package_scewm.wm"), pup_dec)
     decrypt_sceas(os.path.join(pup_dst, "package_sceas.as"), pup_dec)
 
-    decrypt_cpup(pup_dst, pup_dec)
+    try:
+        decrypt_cpup(pup_dst, pup_dec)
+    except Exception as e:
+        print("Failed to extract cpup", e)
 
     slb2_path = os.path.join(pup_dec, "boot_slb2-00.pkg.seg02")
     if os.path.exists(slb2_path):
@@ -362,9 +366,11 @@ def extract_pup(pup, output):
     decrypt_os0(output)
 
     kd_folder = output+"/fs_dec/os0/kd"
-    bootimage_out = kd_folder+"/bootimage"
-    os.makedirs(bootimage_out, exist_ok=True)
-    extract_bootimage(kd_folder+"/bootimage.elf", bootimage_out)
+    bootimage_path = kd_folder+"/bootimage.elf"
+    if os.path.exists(bootimage_path):
+        bootimage_out = kd_folder+"/bootimage"
+        os.makedirs(bootimage_out, exist_ok=True)
+        extract_bootimage(bootimage_path, bootimage_out)
 
 
 def main(args):

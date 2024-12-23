@@ -65,10 +65,12 @@ class SCEUF:
         print(f"Target: {self.target.name}")
         print("-" * 80)
 
-g_typecount = defaultdict(int)
+
 
 
 def print_info(name: str):
+    typecount = defaultdict(int)
+
     with open(name, "rb") as f:
         header = SCEUF.read(f)
         header.print()
@@ -82,7 +84,7 @@ def print_info(name: str):
             if not filename:
                 f.seek(offset)
                 hdr = f.read(0x1000)
-                filename = make_filename(hdr, filetype, g_typecount)
+                filename = make_filename(hdr, filetype, typecount)
 
             print(f"{filename=} {filetype=} {offset=:x} {length=:x} {flags=:x}")
 

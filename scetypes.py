@@ -135,7 +135,7 @@ class KeyStore:
         for item in self._store[keytype][scetype][selftype]:
             if (sysver < 0 or (sysver >= item.minver and sysver <= item.maxver)) and (keyrev < 0 or keyrev == item.keyrev):
                 return (item.key, item.iv)
-        print(f"{keytype=} {scetype=} {sysver=} {keyrev=} {selftype}")
+        print(f"{keytype=} {scetype=} {sysver=:x} {keyrev=} {selftype}")
         raise KeyError("Cannot find key/iv for this SCE file")
 
 
@@ -288,18 +288,76 @@ class ElfPhdr:
             self.p_flags,
             self.p_align
         ) = struct.unpack('<IIIIIIII', data)
+    
+    def pack(self):
+        return struct.pack("<IIIIIIII",
+            self.p_type,
+            self.p_offset,
+            self.p_vaddr,
+            self.p_paddr,
+            self.p_filesz,
+            self.p_memsz,
+            self.p_flags,
+            self.p_align
+        )
 
     def __str__(self):
         ret = ''
-        ret += ' ELF Segment:\n'
-        ret += f'  p_type:          0x{self.p_type:X}\n'
-        ret += f'  p_offset:        0x{self.p_offset:X}\n'
-        ret += f'  p_vaddr:         0x{self.p_vaddr:X}\n'
-        ret += f'  p_paddr:         0x{self.p_paddr:X}\n'
-        ret += f'  p_filesz:        0x{self.p_filesz:X}\n'
-        ret += f'  p_memsz:         0x{self.p_memsz:X}\n'
-        ret += f'  p_flags:         0x{self.p_flags:X}\n'
-        ret += f'  p_align:         0x{self.p_align:X}'
+        ret += 'ELF Segment:\n'
+        ret += f' p_type:          0x{self.p_type:X}\n'
+        ret += f' p_offset:        0x{self.p_offset:X}\n'
+        ret += f' p_vaddr:         0x{self.p_vaddr:X}\n'
+        ret += f' p_paddr:         0x{self.p_paddr:X}\n'
+        ret += f' p_filesz:        0x{self.p_filesz:X}\n'
+        ret += f' p_memsz:         0x{self.p_memsz:X}\n'
+        ret += f' p_flags:         0x{self.p_flags:X}\n'
+        ret += f' p_align:         0x{self.p_align:X}'
+        return ret
+
+class ElfShdr:
+    Size = 0x28
+
+    def __init__(self, data):
+        (
+            self.sh_name,
+            self.sh_type,
+            self.sh_flags,
+            self.sh_addr,
+            self.sh_offset,
+            self.sh_size,
+            self.sh_link,
+            self.sh_info,
+            self.sh_addralign,
+            self.sh_entsize
+        ) = struct.unpack('<IIIIIIIIII', data)
+    
+    def pack(self):
+        return struct.pack('<IIIIIIIIII',
+            self.sh_name,
+            self.sh_type,
+            self.sh_flags,
+            self.sh_addr,
+            self.sh_offset,
+            self.sh_size,
+            self.sh_link,
+            self.sh_info,
+            self.sh_addralign,
+            self.sh_entsize
+        )
+
+    def __str__(self):
+        ret = ''
+        ret += 'ELF Section:\n'
+        ret += f' sh_name:           0x{self.sh_name:X}\n'
+        ret += f' sh_type:           0x{self.sh_type:X}\n'
+        ret += f' sh_flags:          0x{self.sh_flags:X}\n'
+        ret += f' sh_addr:           0x{self.sh_addr:X}\n'
+        ret += f' sh_offset:         0x{self.sh_offset:X}\n'
+        ret += f' sh_size:           0x{self.sh_size:X}\n'
+        ret += f' sh_link:           0x{self.sh_link:X}\n'
+        ret += f' sh_info:           0x{self.sh_info:X}\n'
+        ret += f' sh_addralign:      0x{self.sh_addralign:X}\n'
+        ret += f' sh_entsize:        0x{self.sh_entsize:X}\n'
         return ret
 
 

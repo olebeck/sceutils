@@ -10,8 +10,12 @@ PSP2UPDAT*
 *.pkg
 *.self
 *.seg02
+*.skprx
+*.suprx
 
 PUP/
 PUP_dec/
 fs/
 fs_dec/
+SLB2/
+SLB2_dec/

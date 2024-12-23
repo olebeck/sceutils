@@ -108,7 +108,7 @@ class EmmcMasterBlock:
 
         return ret
 
-def main(fname: str):
+def main(fname: str, output_arg: str):
     " main "
 
     if fname.endswith(".zip"):
@@ -117,8 +117,10 @@ def main(fname: str):
     else:
         emmc = open(fname, "rb")
 
+    os.makedirs(output_arg, exist_ok=True)
+
     try:
-        base = os.path.dirname(fname)
+        base = output_arg
         master = EmmcMasterBlock(emmc.read(EmmcMasterBlock.Size))
         print(master)
 
@@ -198,18 +200,19 @@ def main(fname: str):
 
 if __name__ == "__main__":
     fname_arg = sys.argv[1]
-    if len(sys.argv) > 2:
+    output_arg = sys.argv[2]
+    if len(sys.argv) > 3:
         import pup_fiction
-        pup_fiction.use_keys(sys.argv[2])
+        pup_fiction.use_keys(sys.argv[3])
         DO_EXTRACT = True
 
     if os.path.isdir(fname_arg):
         for zipname in glob(fname_arg+"/*/*.zip"):
             zipname = zipname.replace("\\","/")
             print(zipname)
-            main(zipname)
+            main(zipname, output_arg)
         for imgname in glob(fname_arg+"/*/*.img"):
             print(imgname)
-            main(imgname)
+            main(imgname, output_arg)
     else:
-        main(fname_arg)
+        main(fname_arg, output_arg)
