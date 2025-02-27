@@ -17,8 +17,8 @@ def scedecrypt(inf, outdir, decompress=True, silent=False):
     sce = SceHeader(inf.read(SceHeader.Size))
     if not silent:
         print(sce)
-    (sysver, selftype) = sceutils.get_key_type(inf, sce, silent)
-    scesegs = sceutils.get_segments(inf, sce, sysver, selftype, silent=silent)
+    (sysver, selftype), use_spkg2 = sceutils.get_key_type(inf, sce, silent)
+    scesegs = sceutils.get_segments(inf, sce, sysver, selftype, silent=silent, use_spkg2=use_spkg2)
     for i, sceseg in scesegs.items():
         if not silent:
             print(f'Decrypting segment {i}...')

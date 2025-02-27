@@ -1,7 +1,7 @@
 from Crypto.Cipher import AES
 import zlib
 import binascii
-from scetypes import SceType, KeyType, SelfType, SceSegment, SelfHeader, AppInfoHeader, MetadataInfo, MetadataHeader, MetadataSection, SrvkHeader, SpkgHeader, CompressionType, EncryptionType
+from scetypes import SceHeader, SceType, KeyType, SelfType, SceSegment, SelfHeader, AppInfoHeader, MetadataInfo, MetadataHeader, MetadataSection, SrvkHeader, SpkgHeader, CompressionType, EncryptionType
 from binascii import b2a_hex
 
 
@@ -20,17 +20,18 @@ def print_metadata_keyvault(keys):
         print(f'  {i:#0{4}x}:      {b2a_hex(key)}')
 
 
-def get_segments(inf, sce_hdr, sysver=-1, self_type=SelfType.NONE, keytype=0, klictxt=b"\0"*16, silent=False) -> dict[int, SceSegment]:
+def get_segments(inf, sce_hdr: SceHeader, sysver=-1, self_type=SelfType.NONE, keytype=0, klictxt=b"\0"*16, silent=False, use_spkg2=False) -> dict[int, SceSegment]:
     from keys import SCE_KEYS
     inf.seek(sce_hdr.metadata_offset + 48)
     dat = inf.read(sce_hdr.header_length - sce_hdr.metadata_offset - 48)
-    (key, iv) = SCE_KEYS.get(KeyType.METADATA, sce_hdr.sce_type, sysver, sce_hdr.key_revision, self_type)
+    sce_type = sce_hdr.sce_type if not use_spkg2 else (sce_hdr.sce_type, 2)
+    (key, iv) = SCE_KEYS.get(KeyType.METADATA, sce_type, sysver, sce_hdr.key_revision, self_type)
     hdr_dec = AES.new(key, AES.MODE_CBC, iv)
     if self_type == SelfType.APP:
         keytype = 0
         if sce_hdr.key_revision >= 2:
             keytype = 1
-        (np_key, np_iv) = SCE_KEYS.get(KeyType.NPDRM, sce_hdr.sce_type, sysver, keytype, self_type)
+        (np_key, np_iv) = SCE_KEYS.get(KeyType.NPDRM, sce_type, sysver, keytype, self_type)
         npdrm_dec = AES.new(np_key, AES.MODE_CBC, np_iv)
         predec = npdrm_dec.decrypt(klictxt)
         npdrm_dec2 = AES.new(predec, AES.MODE_CBC, np_iv)
@@ -69,19 +70,19 @@ def get_key_type(inf, sce_hdr, silent=False):
         appinfo_hdr = AppInfoHeader(inf.read(AppInfoHeader.Size))
         if not silent:
             print(appinfo_hdr)
-        return (appinfo_hdr.sys_version, appinfo_hdr.self_type)
+        return (appinfo_hdr.sys_version, appinfo_hdr.self_type), False
     elif sce_hdr.sce_type == SceType.SRVK:
         inf.seek(sce_hdr.header_length)
         srvk = SrvkHeader(inf.read(SrvkHeader.Size))
         if not silent:
             print(srvk)
-        return (srvk.sys_version, SelfType.NONE)
+        return (srvk.sys_version, SelfType.NONE), False
     elif sce_hdr.sce_type == SceType.SPKG:
         inf.seek(sce_hdr.header_length)
         spkg = SpkgHeader(inf.read(SpkgHeader.Size))
         if not silent:
             print(spkg)
-        return (spkg.update_version << 16, SelfType.NONE)
+        return (spkg.update_version << 16, SelfType.NONE), spkg.field_48 == 0x40
     else:
         print(f'Unknown system version for type {sce_hdr.sce_types}')
         return -1
