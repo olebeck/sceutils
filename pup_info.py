@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+if __name__ == "__main__":
+    sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
+
 from collections import defaultdict
 from dataclasses import dataclass
 import struct, enum
 from typing import IO
 
-from util import make_filename
+from sceutils.util import make_filename
 
 def s_read(format, f):
     return struct.unpack(format, f.read(struct.calcsize(format)))

@@ -2,10 +2,10 @@ import shutil
 from Cryptodome.Hash import SHA1
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 
-import scetypes
-import sceutils
-import self2elf
-import pup_fiction
+import sceutils.scetypes as scetypes
+from sceutils.zrif import zrif_decode
+import sceutils.self2elf as self2elf
+import sceutils.pup_fiction as pup_fiction
 
 
 def test_self2elf():
@@ -65,7 +65,7 @@ class Test_pup_fiction:
 
 
 def test_zrif():
-    rif_data = sceutils.zrif_decode("KO5ifR1dQ+d7BRgYGphBbbG0MAfZ7xTk4urn7urtGeLh6utqYIjPfwmdPwseyB0sSbfTn/9oip3YaIwPbgAANDMUlgAA")
+    rif_data = zrif_decode("KO5ifR1dQ+d7BRgYGphBbbG0MAfZ7xTk4urn7urtGeLh6utqYIjPfwmdPwseyB0sSbfTn/9oip3YaIwPbgAANDMUlgAA")
     rif = scetypes.SceRIF(rif_data)
     print(rif)
 

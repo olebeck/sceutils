@@ -3,7 +3,7 @@ import struct
 from collections import defaultdict
 from enum import Enum
 from typing import NamedTuple, IO, ClassVar, Type, TypeVar
-from util import c_str
+from sceutils.util import c_str
 
 SCE_MAGIC = 0x00454353
 

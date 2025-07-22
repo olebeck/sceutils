@@ -1,6 +1,6 @@
 from typing import Literal
 import os, sys, importlib
-from scetypes import KeyStore
+from sceutils.scetypes import KeyStore
 
 ENC_KEY: bytes
 ENC_IV: bytes
@@ -21,5 +21,5 @@ def use_keys(name: Literal["keys_external.py", "keys_internal.py", "keys_proto.p
     dir_ = os.path.dirname(name)
     if dir_ not in sys.path:
         sys.path.append(os.path.dirname(name))
-    mod = importlib.import_module(mod_name)
+    mod = importlib.import_module("sceutils."+mod_name)
     globals().update(vars(mod))

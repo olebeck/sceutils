@@ -1,9 +1,4 @@
-import os
-from typing import Literal
 import struct
-import sys
-from importlib import import_module
-
 
 def _make_unpacker(fmt):
     size = struct.calcsize(fmt)

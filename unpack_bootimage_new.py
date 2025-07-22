@@ -1,6 +1,11 @@
 import os
 import sys
-import pup_fiction
+if __name__ == "__main__":
+    sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
+
+import os
+import sys
+import sceutils.pup_fiction as pup_fiction
 
 
 def main(argv):

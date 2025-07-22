@@ -1,12 +1,17 @@
+
+import os
+import sys
+if __name__ == "__main__":
+    sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
+
 from typing import IO
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Cipher import AES
 import tarfile
 import struct
-import os
 from io import BytesIO
 
-import axfs
+import sceutils.axfs as axfs
 
 
 CPUP_MAGIC = 0x43705570

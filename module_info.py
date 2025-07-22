@@ -1,3 +1,9 @@
+
+import os
+import sys
+if __name__ == "__main__":
+    sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
+
 import sys, json
 from scetypes import ElfHeader, ElfPhdr, SceModuleInfo, SceModuleImports, SceModuleImports2
 from util import c_str

@@ -2,16 +2,20 @@
 
 import os
 import sys
+if __name__ == "__main__":
+    sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
+
 from typing import IO
 import zlib
 import argparse
-import sceutils
-from scetypes import SecureBool, SceHeader, SelfHeader, AppInfoHeader, ElfHeader, ElfPhdr, ElfShdr, SegmentInfo, SceVersionInfo, SceControlInfo, SceControlInfoDigest256, ControlType, SceControlInfoDRM, SceRIF
 from Cryptodome.Cipher import AES
 from Cryptodome.Util import Counter
 import copy
 
-import keys
+from .scetypes import SecureBool, SceHeader, SelfHeader, AppInfoHeader, ElfHeader, ElfPhdr, ElfShdr, SegmentInfo, SceVersionInfo, SceControlInfo, SceControlInfoDigest256, ControlType, SceControlInfoDRM, SceRIF
+from sceutils.scedecrypt import get_segments
+from sceutils.zrif import zrif_decode
+import sceutils.keys as keys
 
 
 def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, silent=False, ignore_sysver=False):
@@ -114,7 +118,7 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
     # get keys
     scesegs = {}
     if encrypted:
-        scesegs = sceutils.get_segments(inf, sce, appinfo_hdr.sys_version, appinfo_hdr.self_type, npdrmtype, klictxt, silent)
+        scesegs = get_segments(inf, sce, appinfo_hdr.sys_version, appinfo_hdr.self_type, npdrmtype, klictxt, silent)
 
     # placeholder phdrs
     phdrs_offset = outf.tell()
@@ -222,7 +226,7 @@ def main(args):
             with open(args.keyriffile, "rb") as rif:
                 lic = SceRIF(rif.read(SceRIF.Size()))
         elif args.zrif:
-            rif = sceutils.zrif_decode(args.zrif)[:SceRIF.Size()]
+            rif = zrif_decode(args.zrif)[:SceRIF.Size()]
             lic = SceRIF.unpack(rif)
         self2elf(inf, outf, *((lic.klicense,) if lic else ()))
 

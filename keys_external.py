@@ -1,5 +1,5 @@
 import binascii
-from scetypes import KeyType, KeyStore, SceType, SelfType
+from sceutils.scetypes import KeyType, KeyStore, SceType, SelfType
 
 ENC_KEY = binascii.a2b_hex('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
 ENC_IV =  binascii.a2b_hex('AF5F2CB04AC1751ABF51CEF1C8096210')

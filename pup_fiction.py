@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+if __name__ == "__main__":
+    sys.path.append(os.path.abspath(os.path.join(__file__, '..', '..')))
+
 import argparse
 import pathlib
 import struct
 from collections import defaultdict
-import os
 import glob
 import subprocess
-import sys
 from typing import Optional
 
 from Cryptodome.Cipher import AES
 
 from util import u8, u32, c_str, make_filename
-from scedecrypt import scedecrypt
-from self2elf import self2elf
-from decrypt_cpupdate import decrypt_unpack_cpup, extract_cpup
-import pup_info
-import keys
+from sceutils.scedecrypt import scedecrypt
+from sceutils.self2elf import self2elf
+from sceutils.decrypt_cpupdate import decrypt_unpack_cpup, extract_cpup
+import sceutils.pup_info as pup_info
+import sceutils.keys as keys
 
 PARTITIONS = ["os0", "vs0", "sa0", "pd0"]
 
