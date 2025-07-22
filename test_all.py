@@ -1,5 +1,5 @@
 import shutil
-from Crypto.Hash import SHA1
+from Cryptodome.Hash import SHA1
 from tempfile import TemporaryDirectory, NamedTemporaryFile
 
 import scetypes

@@ -7,14 +7,14 @@ import sys
 import zlib
 import sceutils
 from scetypes import SceHeader
-from Crypto.Cipher import AES
-from Crypto.Util import Counter
+from Cryptodome.Cipher import AES
+from Cryptodome.Util import Counter
 
-from util import use_keys
+import keys
 
 
 def scedecrypt(inf, outdir, decompress=True, silent=False):
-    sce = SceHeader(inf.read(SceHeader.Size))
+    sce = SceHeader.unpack(inf)
     if not silent:
         print(sce)
     (sysver, selftype), use_spkg2 = sceutils.get_key_type(inf, sce, silent)
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     parser.add_argument("-keys", type=pathlib.Path, default="keys_external.py", required=False)
     args = parser.parse_args()
 
-    use_keys(args.keys)
+    keys.use_keys(args.keys)
 
     with open(args.filename, "rb") as inf:
         scedecrypt(inf, args.outdir)

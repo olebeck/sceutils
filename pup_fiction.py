@@ -10,15 +10,16 @@ import subprocess
 import sys
 from typing import Optional
 
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 
-from util import u8, u32, c_str, use_keys, make_filename
+from util import u8, u32, c_str, make_filename
 from scedecrypt import scedecrypt
 from self2elf import self2elf
 from decrypt_cpupdate import decrypt_unpack_cpup, extract_cpup
 import pup_info
+import keys
 
-partitions = ["os0", "vs0", "sa0", "pd0"]
+PARTITIONS = ["os0", "vs0", "sa0", "pd0"]
 
 
 unarzl_exe = os.path.join(os.path.dirname(os.path.realpath(__file__)), "unarzl", "unarzl")
@@ -95,7 +96,7 @@ def pup_decrypt_packages(src: str, dst: str):
                 except KeyError:
                     print(f"[!] Couldn't decrypt {filename}")
 
-    for partition in partitions:
+    for partition in PARTITIONS:
         join_files(os.path.join(dst, f"{partition}-*.pkg.seg02"), os.path.join(dst, f"{partition}.bin"))
 
     print("-" * 80)
@@ -125,8 +126,6 @@ def slb2_extract(src, dst):
 
 
 def enc_decrypt(src, dst):
-    from keys import ENC_KEY, ENC_IV
-
     with open(src, "rb") as fin:
         data = fin.read()
 
@@ -135,19 +134,16 @@ def enc_decrypt(src, dst):
     if magic != 0x64B2C8E5:
         raise RuntimeError("enc format invalid")
 
-    aes = AES.new(ENC_KEY, AES.MODE_CBC, ENC_IV)
+    aes = AES.new(keys.ENC_KEY, AES.MODE_CBC, keys.ENC_IV)
     data = data[offset:offset + data_size]
     with open(dst, "wb") as fout:
         fout.write(aes.decrypt(data))
 
 
 def decrypt_scewm(src, dst):
-    from keys import SCEWM_KEY, SCEWM_IV
-    aes = AES.new(SCEWM_KEY, AES.MODE_CBC, SCEWM_IV)
-
+    aes = AES.new(keys.SCEWM_KEY, AES.MODE_CBC, keys.SCEWM_IV)
     with open(src, "rb") as fin:
         data = fin.read()[0x20:]
-
     with open(os.path.join(dst, os.path.basename(src)), "wb") as fout:
         dec = aes.decrypt(data)
         fout.write(dec[0x100:-0x100])
@@ -160,8 +156,7 @@ def decrypt_sceas(src, dst):
         fin.seek(0x20)
         data = fin.read()
     try:
-        from keys import SCEAS_KEY, SCEAS_IV
-        aes = AES.new(SCEAS_KEY, AES.MODE_CBC, SCEAS_IV)
+        aes = AES.new(keys.SCEAS_KEY, AES.MODE_CBC, keys.SCEAS_IV)
         with open(os.path.join(dst, os.path.basename(src)), "wb") as fout:
             fout.write(aes.decrypt(data))
         print(f"Decrypted: {os.path.basename(src)}")
@@ -210,11 +205,11 @@ def slb2_decrypt(src, dst):
     print("-" * 80)
 
 
-def extract_fs(output):
+def extract_fs(output: str):
     fs_output = os.path.join(output, "fs")
     os.mkdir(fs_output)
 
-    for partition in partitions:
+    for partition in PARTITIONS:
         partition_in = os.path.join(output, "PUP_dec", f"{partition}.bin")
         if not os.path.exists(partition_in):
             continue
@@ -231,11 +226,11 @@ def extract_fs(output):
     print("-" * 80)
 
 
-def mkdir_p(path):
+def mkdir_p(path: str):
     os.makedirs(path, exist_ok=True)
 
 
-def decrypt_selfs(in_dir, out_dir, blacklist=None):
+def decrypt_selfs(in_dir: str, out_dir: str, blacklist=None):
     if not blacklist:
         blacklist = []
 
@@ -256,7 +251,7 @@ def decrypt_selfs(in_dir, out_dir, blacklist=None):
 
 
 def decrypt_fs(output):
-    for partition in partitions + ["vs0_tarpatch"]:
+    for partition in PARTITIONS + ["vs0_tarpatch"]:
         part_in = os.path.join(output, "fs", partition)
         part_out = os.path.join(output, "fs_dec", partition)
         decrypt_selfs(part_in, part_out)
@@ -318,7 +313,7 @@ def extract_bootimage(filename: str, output: str):
 
         print(f"Writing {name}...")
         mod = data[start:start + size]
-        with open(os.path.join(output, basename), "wb") as fout:
+        with open(os.path.join(output, basename+".elf"), "wb") as fout:
             fout.write(mod)
 
 
@@ -385,7 +380,7 @@ def main(args):
     parser.add_argument("-keys", type=pathlib.Path, default=pathlib.Path("./keys_external.py"), required=False)
     args: _args = parser.parse_args(args)
 
-    use_keys(args.keys.as_posix())
+    keys.use_keys(args.keys.as_posix())
     extract_pup(args.PUP.as_posix(), args.output.as_posix())
 
 

@@ -7,59 +7,59 @@ import zlib
 import argparse
 import sceutils
 from scetypes import SecureBool, SceHeader, SelfHeader, AppInfoHeader, ElfHeader, ElfPhdr, ElfShdr, SegmentInfo, SceVersionInfo, SceControlInfo, SceControlInfoDigest256, ControlType, SceControlInfoDRM, SceRIF
-from Crypto.Cipher import AES
-from Crypto.Util import Counter
+from Cryptodome.Cipher import AES
+from Cryptodome.Util import Counter
 import copy
 
-from util import use_keys
+import keys
 
 
 def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, silent=False, ignore_sysver=False):
     npdrmtype = 0
 
-    sce = SceHeader(inf.read(SceHeader.Size))
+    sce = SceHeader.unpack(inf)
     if not silent:
         print(sce)
-    self_hdr = SelfHeader(inf.read(SelfHeader.Size))
+    self_hdr = SelfHeader.unpack(inf)
 
     inf.seek(self_hdr.appinfo_offset)
-    appinfo_hdr = AppInfoHeader(inf.read(AppInfoHeader.Size))
+    appinfo_hdr = AppInfoHeader.unpack(inf)
     if ignore_sysver:
         appinfo_hdr.sys_version = -1
     if not silent:
         print(appinfo_hdr)
 
     inf.seek(self_hdr.sceversion_offset)
-    verinfo_hdr = SceVersionInfo(inf.read(SceVersionInfo.Size))
+    verinfo_hdr = SceVersionInfo.unpack(inf)
     if not silent:
         print(verinfo_hdr)
 
     inf.seek(self_hdr.controlinfo_offset)
     controlinfo_hdr = None
     while controlinfo_hdr is None or controlinfo_hdr.more:
-        controlinfo_hdr = SceControlInfo(inf.read(SceControlInfo.Size))
+        controlinfo_hdr = SceControlInfo.unpack(inf)
         if not silent:
             print(controlinfo_hdr)
     
         control_size = controlinfo_hdr.size - 0x10
-        if controlinfo_hdr.type == ControlType.CONTROL_FLAGS:
+        if controlinfo_hdr.control_type == ControlType.CONTROL_FLAGS:
             inf.read(control_size)
 
-        elif controlinfo_hdr.type == ControlType.DIGEST_SHA256:
-            controldigest256 = SceControlInfoDigest256(inf.read(SceControlInfoDigest256.Size))
+        elif controlinfo_hdr.control_type == ControlType.DIGEST_SHA256:
+            controldigest256 = SceControlInfoDigest256.unpack(inf)
             if not silent:
                 print(controldigest256)
 
-        elif controlinfo_hdr.type == ControlType.NPDRM_VITA:
-            controlnpdrm = SceControlInfoDRM(inf.read(SceControlInfoDRM.Size))
+        elif controlinfo_hdr.control_type == ControlType.NPDRM_VITA:
+            controlnpdrm = SceControlInfoDRM.unpack(inf)
             npdrmtype = controlnpdrm.npdrm_type
             if not silent:
                 print(controlnpdrm)
 
-        elif controlinfo_hdr.type == ControlType.UNK_SIG1:
+        elif controlinfo_hdr.control_type == ControlType.UNK_SIG1:
             inf.read(control_size)
         
-        elif controlinfo_hdr.type == ControlType.UNK_HASH1:
+        elif controlinfo_hdr.control_type == ControlType.UNK_HASH1:
             inf.read(control_size)
 
         else:
@@ -68,8 +68,7 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
 
     # read ehdr
     inf.seek(self_hdr.elf_offset)
-    dat = inf.read(ElfHeader.Size)
-    elf_hdr = ElfHeader(dat)
+    elf_hdr = ElfHeader.unpack(inf)
     if not silent:
         print(elf_hdr)
 
@@ -77,8 +76,7 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
     elf_phdrs: list[ElfPhdr] = []
     inf.seek(self_hdr.phdr_offset)
     for i in range(elf_hdr.e_phnum):
-        dat = inf.read(ElfPhdr.Size)
-        phdr = ElfPhdr(dat)
+        phdr = ElfPhdr.unpack(inf)
         if not silent:
             print(phdr)
         elf_phdrs.append(phdr)
@@ -87,8 +85,7 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
     elf_shdrs: list[ElfShdr] = []
     inf.seek(self_hdr.shdr_offset)
     for i in range(elf_hdr.e_shnum):
-        dat = inf.read(ElfShdr.Size)
-        shdr = ElfShdr(dat)
+        shdr = ElfShdr.unpack(inf)
         if not silent:
             print(shdr)
         elf_shdrs.append(shdr)
@@ -98,7 +95,7 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
     segment_infos: list[SegmentInfo] = []
     inf.seek(self_hdr.segment_info_offset)
     for i in range(elf_hdr.e_phnum):
-        segment_info = SegmentInfo(inf.read(SegmentInfo.Size))
+        segment_info = SegmentInfo.unpack(inf)
         if not silent:
             print(segment_info)
         segment_infos.append(segment_info)
@@ -112,7 +109,7 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
 
     # placeholder elf header
     elf_header_offset = outf.tell()
-    outf.write(b"\0" * ElfHeader.Size)
+    outf.write(b"\0" * elf_hdr.Size())
 
     # get keys
     scesegs = {}
@@ -121,7 +118,7 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
 
     # placeholder phdrs
     phdrs_offset = outf.tell()
-    outf.write(b"\0" * (ElfPhdr.Size * len(elf_phdrs)))
+    outf.write(b"\0" * (ElfPhdr.Size() * len(elf_phdrs)))
 
     phdr_offsets_out: list[int] = [0] * elf_hdr.e_phnum
     # copy segments, decrypted and decompressed if needed
@@ -168,7 +165,7 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
 
     # placeholder shdr
     shdrs_offset = outf.seek(0, 2)
-    outf.write(b"0" * (ElfShdr.Size * elf_hdr.e_shnum))
+    outf.write(b"0" * (ElfShdr.Size() * elf_hdr.e_shnum))
 
     # write shdr data that isnt in any segments, ie things not loaded by the os
     shdr_offsets_out: list[int] = [0] * elf_hdr.e_shnum
@@ -214,7 +211,7 @@ def main(args):
     parser.add_argument("-K", "--keys", help="keys filename", type=str, default="keys_external.py")
     args = parser.parse_args(args)
     
-    use_keys(args.keys)
+    keys.use_keys(args.keys)
 
     if args.outputfile == "null":
         args.outputfile = os.devnull
@@ -223,10 +220,10 @@ def main(args):
         lic = None
         if args.keyriffile:
             with open(args.keyriffile, "rb") as rif:
-                lic = SceRIF(rif.read(SceRIF.Size))
+                lic = SceRIF(rif.read(SceRIF.Size()))
         elif args.zrif:
-            rif = sceutils.zrif_decode(args.zrif)[:SceRIF.Size]
-            lic = SceRIF(rif)
+            rif = sceutils.zrif_decode(args.zrif)[:SceRIF.Size()]
+            lic = SceRIF.unpack(rif)
         self2elf(inf, outf, *((lic.klicense,) if lic else ()))
 
 

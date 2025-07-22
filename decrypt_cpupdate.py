@@ -1,6 +1,6 @@
 from typing import IO
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import AES
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Cipher import AES
 import tarfile
 import struct
 import os
