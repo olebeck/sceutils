@@ -8,6 +8,9 @@ import subprocess
 from enum import Enum
 import zipfile
 
+import pup_fiction
+from keys import use_keys
+
 DO_EXTRACT = True
 EMMC_BLOCK_SIZE = 512
 
@@ -201,10 +204,8 @@ def main(fname: str, output_arg: str):
 if __name__ == "__main__":
     fname_arg = sys.argv[1]
     output_arg = sys.argv[2]
-    if len(sys.argv) > 3:
-        import pup_fiction
-        pup_fiction.use_keys(sys.argv[3])
-        DO_EXTRACT = True
+
+    use_keys(sys.argv[3] if len(sys.argv) > 3 else "keys_external.py")
 
     if os.path.isdir(fname_arg):
         for zipname in glob(fname_arg+"/*/*.zip"):
