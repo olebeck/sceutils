@@ -11,8 +11,11 @@ import zipfile
 import pup_fiction
 from keys import use_keys
 
+from typing import IO
+
 DO_EXTRACT = True
 EMMC_BLOCK_SIZE = 512
+
 
 class EmmcPartitionCode(Enum):
     EMPTY = 0
@@ -31,6 +34,7 @@ class EmmcPartitionCode(Enum):
     UNKOWN_MC = 0xD
     PD0 = 0xE
 
+
 class EmmcPartitionType(Enum):
     UNKNOWN_0 = 0
     FAT16 = 0x6
@@ -38,12 +42,14 @@ class EmmcPartitionType(Enum):
     UNKNOWN = 0xB
     RAW = 0xDA
 
+
 def sizeof_fmt(num, suffix='B'):
     for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
         if abs(num) < 1024.0:
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f%s%s" % (num, 'Yi', suffix)
+
 
 class EmmcPartition:
     Size = 0x11
@@ -72,6 +78,7 @@ class EmmcPartition:
         ret += f'Active:           {self.active}\n'
         ret += f'Flags:            0x{self.flags:08X}\n'
         return ret
+
 
 class EmmcMasterBlock:
     Size = 0x200
@@ -111,9 +118,95 @@ class EmmcMasterBlock:
 
         return ret
 
-def main(fname: str, output_arg: str):
-    " main "
 
+def extract_partition(emmc: IO, p: EmmcPartition, partition_image_name: str):
+    if not os.path.exists(partition_image_name):
+        with open(partition_image_name, "wb") as f:
+            emmc.seek(p.offset)
+            length = 0
+
+            while length != p.size:
+                data = emmc.read(min(p.size - length, int(100e6)))
+                if len(data) == 0 or data is None:
+                    break
+
+                f.write(data)
+                length += len(data)
+                print(f'{100*length/p.size:.2f}%... ')
+
+        if length != p.size:
+            print(f'output {p.code.name} is truncated ({100*length/p.size:.2f}% dumped)')
+
+
+def extract_fs(basedir: str, partition_name: str, p: EmmcPartition, partition_image_name: str):
+    print(f"Extracting {partition_name}")
+    partition_out = os.path.join(basedir, "fs", partition_name)
+    if not os.path.exists(partition_out):
+        subprocess.call(["7z", "x", partition_image_name, f"-o{partition_out}"])
+
+    partition_dec_out = os.path.join(basedir, "fs_dec", partition_name)
+    if not os.path.exists(partition_dec_out):
+        print("Decryping selfs")
+        pup_fiction.decrypt_selfs(partition_out, partition_dec_out)
+
+    if p.code == EmmcPartitionCode.OS0:
+        if not os.path.exists(partition_dec_out):
+            print("decrypting os0")
+            pup_fiction.decrypt_os0(basedir)
+
+        try:
+            bootimage_out = partition_dec_out+"/kd/bootimage"
+            if not os.path.exists(bootimage_out):
+                print("decrypting bootimage")
+                os.makedirs(bootimage_out, exist_ok=True)
+                pup_fiction.extract_bootimage(partition_dec_out+"/kd/bootimage.elf", bootimage_out)
+        except Exception as e:
+            print("error extracting bootimage")
+            print(e)
+
+
+def extract_slb2(basedir: str, partition_name: str, partition_image_name: str):
+    slb2_out = os.path.join(basedir, partition_name)
+    if not os.path.exists(slb2_out):
+        print("extracting slb2")
+        os.makedirs(slb2_out, exist_ok=True)
+        pup_fiction.slb2_extract(partition_image_name, slb2_out)
+
+    slb2_dec_out = os.path.join(basedir, partition_name+"_dec")
+    if not os.path.exists(slb2_dec_out):
+        print("decrypting slb2")
+        os.makedirs(slb2_dec_out, exist_ok=True)
+        try:
+            pup_fiction.slb2_decrypt(slb2_out, slb2_dec_out)
+        except KeyError as e:
+            with open(slb2_dec_out+"/error.txt", "w", encoding="utf8") as f:
+                f.write(str(e))
+            print(e)
+
+
+def extract_emmc(emmc: IO, basedir: str):
+    master = EmmcMasterBlock(emmc.read(EmmcMasterBlock.Size))
+    print(master)
+
+    for p in master.partitions:
+        partition_name = p.code.name.lower()
+        have_inactive = len([x for x in master.partitions if x.code == p.code]) > 1
+        if have_inactive:
+            partition_name = f"{partition_name}_{'active' if p.active else 'inactive'}"
+        name = f'{partition_name}.bin'
+
+        partition_image_name = f"{basedir}/{name}"
+        print(f'extracting {partition_image_name}... ')
+        extract_partition(emmc, p, partition_image_name)
+
+        if p.code in (EmmcPartitionCode.OS0, EmmcPartitionCode.VS0) and DO_EXTRACT:
+            extract_fs(basedir, partition_name, p, partition_image_name)
+
+        if p.code == EmmcPartitionCode.SLB2 and DO_EXTRACT:
+            extract_slb2(basedir, partition_name, partition_image_name)
+
+
+def main(fname: str, output_arg: str):
     if fname.endswith(".zip"):
         z = zipfile.PyZipFile(fname)
         emmc = z.open(z.namelist()[0], "r")
@@ -121,82 +214,8 @@ def main(fname: str, output_arg: str):
         emmc = open(fname, "rb")
 
     os.makedirs(output_arg, exist_ok=True)
-
     try:
-        base = output_arg
-        master = EmmcMasterBlock(emmc.read(EmmcMasterBlock.Size))
-        print(master)
-
-        for p in master.partitions:
-            partition_name = p.code.name.lower()
-            if len([x for x in master.partitions if x.code == p.code]) > 1:
-                partition_name = f"{partition_name}_{'active' if p.active else 'inactive'}"
-            name = f'{partition_name}.bin'
-
-            partition_image_name = f"{base}/{name}"
-            print(f'extracting {partition_image_name}... ')
-
-            if not os.path.exists(partition_image_name):
-                with open(partition_image_name, "wb") as f:
-                    emmc.seek(p.offset)
-                    length = 0
-
-                    while length != p.size:
-                        data = emmc.read(min(p.size - length, int(100e6)))
-                        if len(data) == 0 or data is None:
-                            break
-
-                        f.write(data)
-                        length += len(data)
-                        print(f'{100*length/p.size:.2f}%... ')
-
-                if length != p.size:
-                    print(f'output {name} is truncated ({100*length/p.size:.2f}% dumped)')
-
-            if p.code in (EmmcPartitionCode.OS0, EmmcPartitionCode.VS0) and DO_EXTRACT:
-                print(f"Extracting {partition_name}")
-                partition_out = os.path.join(base, "fs", partition_name)
-                if not os.path.exists(partition_out):
-                    subprocess.call(["7z", "x", partition_image_name, f"-o{partition_out}"])
-
-                partition_dec_out = os.path.join(base, "fs_dec", partition_name)
-                if not os.path.exists(partition_dec_out):
-                    print("Decryping selfs")
-                    pup_fiction.decrypt_selfs(partition_out, partition_dec_out)
-
-                if p.code == EmmcPartitionCode.OS0:
-                    if not os.path.exists(partition_dec_out):
-                        print("decrypting os0")
-                        pup_fiction.decrypt_os0(base)
-
-                    try:
-                        bootimage_out = partition_dec_out+"/kd/bootimage"
-                        if not os.path.exists(bootimage_out):
-                            print("decrypting bootimage")
-                            os.makedirs(bootimage_out, exist_ok=True)
-                            pup_fiction.extract_bootimage(partition_dec_out+"/kd/bootimage.elf", bootimage_out)
-                    except Exception as e:
-                        print("error extracting bootimage")
-                        print(e)
-
-            if p.code == EmmcPartitionCode.SLB2 and DO_EXTRACT:
-                slb2_out = os.path.join(base, partition_name)
-                if not os.path.exists(slb2_out):
-                    print("extracting slb2")
-                    os.makedirs(slb2_out, exist_ok=True)
-                    pup_fiction.slb2_extract(partition_image_name, slb2_out)
-
-                slb2_dec_out = os.path.join(base, partition_name+"_dec")
-                if not os.path.exists(slb2_dec_out):
-                    print("decrypting slb2")
-                    os.makedirs(slb2_dec_out, exist_ok=True)
-                    try:
-                        pup_fiction.slb2_decrypt(slb2_out, slb2_dec_out)
-                    except KeyError as e:
-                        with open(slb2_dec_out+"/error.txt", "w", encoding="utf8") as f:
-                            f.write(str(e))
-                        print(e)
-
+        extract_emmc(emmc, output_arg)
     finally:
         emmc.close()
 

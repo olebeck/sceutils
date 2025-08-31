@@ -83,7 +83,7 @@ def get_key_type(inf, sce_hdr, silent=False):
         spkg = SpkgHeader.unpack(inf)
         if not silent:
             print(spkg)
-        return (spkg.update_version << 16, SelfType.NONE), spkg.field_48 == 0x40
+        return (spkg.update_version << 16, SelfType.NONE), False # spkg.field_48 == 0x40
     else:
         print(f'Unknown system version for type {sce_hdr.sce_types}')
         return -1
