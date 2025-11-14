@@ -118,7 +118,11 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
 
     # placeholder phdrs
     phdrs_offset = outf.tell()
-    outf.write(b"\0" * (ElfPhdr.Size() * len(elf_phdrs)))
+    phdrs_size = (ElfPhdr.Size() * len(elf_phdrs))
+    outf.write(b"\0" * phdrs_size)
+
+    padding = (16 - (outf.tell() % 16))
+    outf.write(b"\0" * padding)
 
     phdr_offsets_out: list[int] = [0] * elf_hdr.e_phnum
     # copy segments, decrypted and decompressed if needed
@@ -153,7 +157,7 @@ def self2elf(inf: IO[bytes], outf=open(os.devnull, "wb"), klictxt=b'\0'*16, sile
         outf.write(b"\0" * align_bytes)
 
         # write back
-        phdr_offsets_out[i] = outf.tell()
+        phdr_offsets_out[idx] = outf.tell()
         outf.write(dat)
 
     # write phdrs
