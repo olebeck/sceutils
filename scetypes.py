@@ -679,7 +679,7 @@ class SceModuleImports(Struct):
     tls_entry_table: int
 
 class SceModuleImports2(Struct):
-    _format = "hhhhhIIIIII"
+    _format = "hhhhIIIIIII"
     size: int
     version: int
     attribute: int

@@ -258,9 +258,9 @@ def decrypt_fs(output):
     print("-" * 80)
 
 
-def decrypt_os0(output):
-    os0_in = os.path.join(output, "fs", "os0")
-    os0_out = os.path.join(output, "fs_dec", "os0")
+def decrypt_os0(output, os0="os0"):
+    os0_in = os.path.join(output, "fs", os0)
+    os0_out = os.path.join(output, "fs_dec", os0)
 
     configs = ["psp2config_dolce.skprx", "psp2config_vita.skprx", "psp2config.skprx"]
 
