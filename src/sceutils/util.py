@@ -1,8 +1,8 @@
 import os
-from typing import Literal
 import struct
 import sys
 from importlib import import_module
+from typing import Literal
 
 
 def _make_unpacker(fmt):

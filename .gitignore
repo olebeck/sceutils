@@ -1,5 +1,6 @@
 .idea
 .vscode
+.venv
 *.pyc
 env
 test/*
@@ -19,3 +20,4 @@ fs/
 fs_dec/
 SLB2/
 SLB2_dec/
+*.egg-info

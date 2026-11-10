@@ -2,8 +2,9 @@ import binascii
 import struct
 from collections import defaultdict
 from enum import Enum
-from typing import NamedTuple, IO, ClassVar, Type, TypeVar
-from util import c_str
+from typing import IO, ClassVar, NamedTuple, Type, TypeVar, Any
+
+from .util import c_str
 
 SCE_MAGIC = 0x00454353
 
@@ -13,14 +14,6 @@ class SceSegment(NamedTuple):
     idx: int
     size: int
     compressed: bool
-    key: bytes
-    iv: bytes
-
-
-class KeyEntry(NamedTuple):
-    minver: int
-    maxver: int
-    keyrev: int
     key: bytes
     iv: bytes
 
@@ -119,72 +112,52 @@ class CompressionType(Enum):
     NONE = 1
     DEFLATE = 2
 
-
-class KeyStore:
-    def __init__(self):
-        self._store = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-
-    def register(self, keytype, scetype, keyrev, key, iv, minver=0, maxver=0xffffffffffffffff, selftype=SelfType.NONE):
-        self._store[keytype][scetype][selftype].append(KeyEntry(minver, maxver, keyrev, binascii.a2b_hex(key), binascii.a2b_hex(iv)))
-
-    def get(self, keytype, scetype, sysver=-1, keyrev=-1, selftype=SelfType.NONE):
-        if keytype not in self._store:
-            raise KeyError("Cannot find any keys for this key type")
-        if scetype not in self._store[keytype]:
-            raise KeyError("Cannot find any keys for this SCE type")
-        if selftype not in self._store[keytype][scetype]:
-            raise KeyError("Cannot find any keys for this SELF type")
-        for item in self._store[keytype][scetype][selftype]:
-            if (sysver < 0 or (sysver >= item.minver and sysver <= item.maxver)) and (keyrev < 0 or keyrev == item.keyrev):
-                return (item.key, item.iv)
-        print(f"{keytype=} {scetype=} {sysver=:x} {keyrev=} {selftype}")
-        raise KeyError("Cannot find key/iv for this SCE file")
-
 T = TypeVar('T', bound='Struct')
 
 class Struct:
-    _format: ClassVar[str] = ""   # Format string for struct
+    _format: ClassVar[str] = ""
+    _size: int = 0
 
     @classmethod
-    def field_names(cls):
-        return [k for k in cls.__annotations__.keys() if k[0] != "_"]
-
-    @classmethod
-    def Size(self):
-        return self.struct_size()
+    def field_names(cls) -> list[tuple[str,Any]]:
+        return [(k,v) for k,v in cls.__annotations__.items() if k[0] != "_"]
 
     def __init__(self, **kwargs):
-        for field in self.field_names():
-            setattr(self, field, kwargs.get(field))
-    
-    @classmethod
-    def struct_size(cls) -> int:
-        return struct.calcsize("="+cls._format)
+        for field_name, field_type in self.field_names():
+            value = kwargs.get(field_name)
+            if isinstance(field_type, Enum):
+                value = field_type(value)
+            setattr(self, field_name, value)
+
+    def _check(self):
+        return
     
     @classmethod
     def unpack(cls: Type[T], data: bytes | IO[bytes], endian="<") -> T:
         if hasattr(data, 'read'):
-            data = data.read(cls.struct_size())
-        
-        if len(data) < cls.struct_size():
-            raise ValueError(f"Not enough data to unpack {cls.__name__}: need {cls.struct_size()}, got {len(data)}")
+            data = data.read(cls._size)  # ty:ignore[call-non-callable]
+
+        if len(data) < cls._size:
+            raise ValueError(f"Not enough data to unpack {cls.__name__}: need {cls._size}, got {len(data)}")
+
+        def decode_value(value, type):
+            if type == str:
+                return value.split(b"\x00")[0].decode()
+            return value
         
         values = struct.unpack(endian + cls._format, data)
-        kwargs = {name: value for name, value in zip(cls.field_names(), values)}
+        kwargs = {name: decode_value(value, type) for (name, type), value in zip(cls.field_names(), values)}
         instance = cls(**kwargs)
-        instance._initialize()
+        instance._check()
         return instance
     
     def pack(self, endian="<") -> bytes:
-        values = tuple(getattr(self, name) for name in self.field_names())
+        values = tuple(getattr(self, name) for name, type in self.field_names())
         return struct.pack(endian + self._format, *values)
-
-    def _initialize(self):
-        return
     
     def __str__(self) -> str:
         lines = [f"{self.__class__.__name__}:"]
-        for name in self.field_names():
+        for name, _ in self.field_names():
             value = getattr(self, name)
             if isinstance(value, int):
                 lines.append(f" {name}: 0x{value:X}")
@@ -194,6 +167,7 @@ class Struct:
     
 class SceHeader(Struct):
     _format = "IIBBHIQQ"
+    _size = 0x20
 
     magic: int
     version: int
@@ -226,6 +200,7 @@ class SceHeader(Struct):
 
 class SelfHeader(Struct):
     _format = "QQQQQQQQQQQ"
+    _size = 0x58
     file_length: int
     field_8: int
     self_offset: int
@@ -241,14 +216,12 @@ class SelfHeader(Struct):
 
 class AppInfoHeader(Struct):
     _format = "QIIQQ"
+    _size = 0x20
     auth_id: int
     vendor_id: int
-    self_type: int
+    self_type: SelfType
     sys_version: int
     field_18: int
-
-    def _initialize(self):
-        self.self_type = SelfType(self.self_type)
 
     def __str__(self):
         ret = ''
@@ -262,6 +235,7 @@ class AppInfoHeader(Struct):
 
 class ElfHeader(Struct):
     _format = "QQHHIIIIIHHHHHH"
+    _size = 0x34
     e_ident_1: int
     e_ident_2: int
     e_type: int
@@ -278,7 +252,7 @@ class ElfHeader(Struct):
     e_shnum: int
     e_shstrndx: int
 
-    def _initialize(self):
+    def _check(self):
         if self.e_ident_1 != 0x10101464C457F:
             raise TypeError('Unknown ELF e_ident')
         if self.e_machine != 0x28 and self.e_machine != 0xF00D:
@@ -290,6 +264,7 @@ class ElfHeader(Struct):
         ret = ''
         ret += 'ELF Header:\n'
         ret += f' e_machine:        {"ARM" if self.e_machine == 0x28 else "MeP"}\n'
+        ret += f' e_type:           0x{self.e_type:X}\n'
         ret += f' e_entry:          0x{self.e_entry:X}\n'
         ret += f' e_phoff:          0x{self.e_phoff:X}\n'
         ret += f' e_phnum:          {self.e_phnum}\n'
@@ -300,6 +275,7 @@ class ElfHeader(Struct):
 
 class ElfPhdr(Struct):
     _format = "IIIIIIII"
+    _size = 0x20
     p_type: int
     p_offset: int
     p_vaddr: int
@@ -324,6 +300,7 @@ class ElfPhdr(Struct):
 
 class ElfShdr(Struct):
     _format = "IIIIIIIIII"
+    _size = 0x28
     sh_name: int
     sh_type: int
     sh_flags: int
@@ -353,16 +330,13 @@ class ElfShdr(Struct):
 
 class SegmentInfo(Struct):
     _format = "QQIIII"
+    _size = 0x20
     offset: int
     size: int
-    compressed: int
+    compressed: SecureBool
     field_14: int
-    plaintext: int
+    plaintext: SecureBool
     field_1C: int
-
-    def _initialize(self):
-        self.compressed = SecureBool(self.compressed)
-        self.plaintext = SecureBool(self.plaintext)
 
     def __str__(self):
         ret = ''
@@ -376,6 +350,7 @@ class SegmentInfo(Struct):
 
 class MetadataInfo(Struct):
     _format = "16sQQ16sQQ"
+    _size = 0x40
     key: bytes
     pad0: int
     pad1: int
@@ -383,7 +358,7 @@ class MetadataInfo(Struct):
     pad2: int
     pad3: int
 
-    def _initialize(self):
+    def _check(self):
         if self.pad0 != 0 or self.pad1 != 0 or self.pad2 != 0 or self.pad3 != 0:
             raise TypeError('Invalid metadata info padding (decryption likely failed)')
 
@@ -397,6 +372,7 @@ class MetadataInfo(Struct):
 
 class MetadataHeader(Struct):
     _format = "QIIIIII"
+    _size = 0x20
     signature_input_length: int
     signature_type: int
     section_count: int
@@ -420,21 +396,17 @@ class MetadataHeader(Struct):
 
 class MetadataSection(Struct):
     _format = "QQIiIiIiiI"
+    _size = 0x30
     offset: int
     size: int
     type: int
     seg_idx: int
-    hashtype: int
+    hashtype: HashType
     hash_idx: int
-    encryption: int
+    encryption: EncryptionType
     key_idx: int
     iv_idx: int
-    compression: int
-
-    def _initialize(self):
-        self.hashtype = HashType(self.hashtype)
-        self.encryption = EncryptionType(self.encryption)
-        self.compression = CompressionType(self.compression)
+    compression: CompressionType
 
     def __str__(self):
         ret = ''
@@ -454,6 +426,7 @@ class MetadataSection(Struct):
 
 class SrvkHeader(Struct):
     _format = "IIQIIII"
+    _size = 0x20
     field_0: int
     field_4: int
     sys_version: int
@@ -477,8 +450,9 @@ class SrvkHeader(Struct):
 
 class SpkgHeader(Struct):
     _format = "IIIIQQQQIIIIQQQQQQQQ"
+    _size = 0x80
     field_0: int
-    pkg_type: int
+    pkg_type: SkpgType
     flags: int
     field_C: int
     update_version: int
@@ -497,9 +471,6 @@ class SpkgHeader(Struct):
     total_parts: int
     field_70: int
     field_78: int
-
-    def _initialize(self):
-        self.pkg_type = SkpgType(self.pkg_type)
 
     def __str__(self):
         ret = ''
@@ -529,10 +500,10 @@ class SpkgHeader(Struct):
 
 class SceVersionInfo(Struct):
     _format = "IIQ"
+    _size = 0x10
     subtype: int
     is_present: int
     size: int
-    Size = 16
 
     def __str__(self):
         ret = 'SCE Version Info Header:\n'
@@ -544,10 +515,10 @@ class SceVersionInfo(Struct):
 
 class SceControlInfo(Struct):
     _format = "IIQ"
+    _size = 0x10
     control_type: ControlType
     size: int
     more: int
-    Size = 16
 
     def _initialize(self):
         self.control_type = ControlType(self.control_type)
@@ -562,6 +533,7 @@ class SceControlInfo(Struct):
 
 class SceControlInfoDigest256(Struct):
     _format = "20s32sIII"
+    _size = 0x40
     sce_hash: bytes
     file_hash: bytes
     filler1: int
@@ -578,6 +550,7 @@ class SceControlInfoDigest256(Struct):
 
 class SceControlInfoDRM(Struct):
     _format = "IHHII48s16s32s32s28s28s28s28s"
+    _size = 0x100
     magic: int
     sig_offset: int
     size: int
@@ -607,6 +580,7 @@ class SceControlInfoDRM(Struct):
 
 class SceRIF(Struct):
     _format = "HHHHQ48s16s16s16sQ20s20s"
+    _size = 0xa0
     majver: int
     minver: int
     style: int
@@ -636,6 +610,7 @@ class SceRIF(Struct):
 
 class SceModuleInfo(Struct):
     _format = "hh27sbIIIIIIIIIIIIIII"
+    _size = 0x5c
     attributes: int
     version: int
     module_name: str
@@ -661,6 +636,7 @@ class SceModuleInfo(Struct):
 
 class SceModuleImports(Struct):
     _format = "hhhhhhIIIIIIIIII"
+    _size = 0x34
     size: int
     version: int
     attribute: int
@@ -680,6 +656,7 @@ class SceModuleImports(Struct):
 
 class SceModuleImports2(Struct):
     _format = "hhhhIIIIIII"
+    _size = 0x24
     size: int
     version: int
     attribute: int
@@ -694,6 +671,7 @@ class SceModuleImports2(Struct):
 
 class SceModuleLibaryExports(Struct):
     _format = "bbhhhhhbbbbIIII"
+    _size = 0x20
     size: int
     pad: int
     version: int

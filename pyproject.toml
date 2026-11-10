@@ -7,3 +7,10 @@ requires-python = ">=3.11"
 dependencies = [
     "pycryptodomex>=3.23.0",
 ]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+sceutils = "sceutils.main:main"

@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 
+import argparse
+import os
 import pathlib
-from typing import IO, Literal, Optional
+import stat
+import struct
+import tarfile
+import zlib
+import sys
 from dataclasses import dataclass
 from io import BytesIO
-import argparse
-import tarfile
-import struct
-import zlib
-import stat
-import os
+from typing import Literal, Optional, IO
 
 PAGE_SHIFT = 12
 
@@ -273,7 +274,7 @@ class AXFS:
         return bytes(out)
 
 
-def main():
+def main(argv = sys.argv):
     class _args:
         command: Literal["list", "tar"]
         inputfile: pathlib.Path
@@ -283,7 +284,7 @@ def main():
     parser.add_argument("command", type=str, choices=["list", "tar"])
     parser.add_argument("inputfile", help="input axfs image", type=pathlib.Path)
     parser.add_argument("output", help="output file name for tar", type=pathlib.Path, required=False)  # optional
-    args: _args = parser.parse_args()
+    args: _args = parser.parse_args(argv[1:])
 
     inputfile = args.inputfile.as_posix()
     output = args.output.as_posix() if args.output else None

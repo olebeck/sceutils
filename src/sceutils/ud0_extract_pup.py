@@ -1,11 +1,12 @@
-import sys, os
-import pup_info
+import os
+import sys
 
+from sceutils import pup_info
 
 BLOCKSIZE = int(10e6)
 
-if __name__ == "__main__":
-    filename = sys.argv[1]
+def main(argv = sys.argv):
+    filename = argv[1]
     print(filename)
 
     with open(filename, "rb") as f:
@@ -26,7 +27,7 @@ if __name__ == "__main__":
                 info = pup_info.SCEUF.read(f)
                 print(info)
                 info.print()
-                yn = "y" #input("extract?")
+                yn = input("extract? [y/n]")
                 if yn != "y":
                     f.seek(before)
                     continue
@@ -36,3 +37,6 @@ if __name__ == "__main__":
                     with open(f"{os.path.basename(filename)}_PSP2_{info.version:x}_{info.build_no}_{real_index:x}.PUP", "wb") as fo:
                         fo.write(pup)
                     print("written pup")
+
+if __name__ == "__main__":
+    main()

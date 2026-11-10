@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 
-from sys import argv
-
 import os
+import sys
 
-from util import u16
+from .util import u16
 
 
-def main():
+def main(argv = sys.argv):
     if len(argv) != 3:
-        print("Usage: extract_idstorage.py idstorage-partition.bin output-directory/")
-        return
+        print(f"Usage: {argv[0]} idstorage-partition.bin output-directory/")
+        sys.exit(1)
 
     with open(argv[1], "rb") as fin:
         data = fin.read()

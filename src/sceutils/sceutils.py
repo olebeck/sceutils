@@ -1,12 +1,18 @@
-from Cryptodome.Cipher import AES
-import zlib
 import binascii
-from scetypes import SceHeader, SceType, KeyType, SelfType, SceSegment, SelfHeader, AppInfoHeader, MetadataInfo, MetadataHeader, MetadataSection, SrvkHeader, SpkgHeader, CompressionType, EncryptionType
+import zlib
 from binascii import b2a_hex
 from typing import IO
-import keys
 
-def zrif_decode(data: str):
+from Cryptodome.Cipher import AES
+
+from . import keys
+from .scetypes import (AppInfoHeader, CompressionType, EncryptionType,
+                               KeyType, MetadataHeader, MetadataInfo,
+                               MetadataSection, SceHeader, SceSegment, SceType,
+                               SelfHeader, SelfType, SpkgHeader, SrvkHeader)
+
+
+def zrif_decode(data: str) -> bytes:
     zrif_dict = list(zlib.decompress(binascii.a2b_base64(b"eNpjYBgFo2AU0AsYAIElGt8MRJiDCAsw3xhEmIAIU4N4AwNdRxcXZ3+/EJCAkW6Ac7C7ARwYgviuQAaIdoPSzlDaBUo7QmknIM3ACIZM78+u7kx3VWYEAGJ9HV0=")))
     d = zlib.decompressobj(wbits=10, zdict=bytes(zrif_dict))
     raw = binascii.a2b_base64(data)
@@ -35,27 +41,27 @@ def get_segments(inf: IO[bytes], sce_hdr: SceHeader, sysver=-1, self_type=SelfTy
         npdrm_dec = AES.new(np_key, AES.MODE_CBC, np_iv)
         predec = npdrm_dec.decrypt(klictxt)
         npdrm_dec2 = AES.new(predec, AES.MODE_CBC, np_iv)
-        dec_in = npdrm_dec2.decrypt(dat[0:MetadataInfo.Size()])
+        dec_in = npdrm_dec2.decrypt(dat[0:MetadataInfo._size])
     else:
-        dec_in = dat[0:MetadataInfo.Size()]
+        dec_in = dat[0:MetadataInfo._size]
 
     dec = hdr_dec.decrypt(dec_in)
     metadata_info = MetadataInfo.unpack(dec)
     if not silent:
         print(metadata_info)
     contents_dec = AES.new(metadata_info.key, AES.MODE_CBC, metadata_info.iv)
-    dec = contents_dec.decrypt(dat[MetadataInfo.Size():])
-    metadata_hdr = MetadataHeader.unpack(dec[0:MetadataHeader.Size()])
+    dec = contents_dec.decrypt(dat[MetadataInfo._size:])
+    metadata_hdr = MetadataHeader.unpack(dec[0:MetadataHeader._size])
     if not silent:
         print(metadata_hdr)
     segs = {}
-    start = MetadataHeader.Size() + metadata_hdr.section_count * MetadataSection.Size()
+    start = MetadataHeader._size + metadata_hdr.section_count * MetadataSection._size
     vault = [dec[start + 16 * x:start + 16 * (x + 1)] for x in range(metadata_hdr.key_count)]
     if not silent:
         print_metadata_keyvault(vault)
     for i in range(metadata_hdr.section_count):
-        dat = dec[MetadataHeader.Size() + i * MetadataSection.Size():]
-        metsec = MetadataSection.unpack(dat[:MetadataSection.Size()])
+        dat = dec[MetadataHeader._size + i * MetadataSection._size:]
+        metsec = MetadataSection.unpack(dat[:MetadataSection._size])
         if not silent:
             print(metsec)
         if metsec.encryption == EncryptionType.AES128CTR:
@@ -63,7 +69,7 @@ def get_segments(inf: IO[bytes], sce_hdr: SceHeader, sysver=-1, self_type=SelfTy
     return segs
 
 
-def get_key_type(inf, sce_hdr, silent=False):
+def get_key_type(inf, sce_hdr, silent=False) -> tuple[tuple[int, SelfType], bool]:
     if sce_hdr.sce_type == SceType.SELF:
         inf.seek(32)
         self_hdr = SelfHeader.unpack(inf)
@@ -85,5 +91,4 @@ def get_key_type(inf, sce_hdr, silent=False):
             print(spkg)
         return (spkg.update_version << 16, SelfType.NONE), False # spkg.field_48 == 0x40
     else:
-        print(f'Unknown system version for type {sce_hdr.sce_types}')
-        return -1
+        raise ValueError(f'Unknown system version for type {sce_hdr.sce_types}')

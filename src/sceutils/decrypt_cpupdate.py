@@ -1,13 +1,13 @@
-from typing import IO
-from Cryptodome.PublicKey import RSA
-from Cryptodome.Cipher import AES
-import tarfile
-import struct
 import os
+import struct
+import tarfile
 from io import BytesIO
+from typing import IO
 
-import axfs
+from Cryptodome.Cipher import AES
+from Cryptodome.PublicKey import RSA
 
+from sceutils import axfs
 
 CPUP_MAGIC = 0x43705570
 TRF_MAGIC = 0x23642745
@@ -28,8 +28,7 @@ def decrypt_unpack_cpup(filename: str, dst: str) -> tarfile.TarFile:
     try:
         tar = tarfile.open(fileobj=BytesIO(data), mode="r:gz")
     except tarfile.ReadError:
-        print("CpUp Extraction failed likely wrong keys")
-        return None
+        raise ValueError("CpUp Extraction failed likely wrong keys")
     return tar
 
 
@@ -38,30 +37,36 @@ def extract_cpup(tar: tarfile.TarFile, dst: str):
     os.mkdir(dst)
 
     # decrypt fsimage0
-    with tar.extractfile("./fsimage0.trf") as fsimage0:
-        fsimage0.seek(0x120)
-        with open(os.path.join(dst, "fsimage0.img"), "wb") as f:
-            f.write(fsimage0.read())
+    fsimage0 = tar.extractfile("./fsimage0.trf")
+    if fsimage0 is None:
+        raise ValueError("fsimage0.trf not found")
+    fsimage0.seek(0x120)
+    with open(os.path.join(dst, "fsimage0.img"), "wb") as f:
+        f.write(fsimage0.read())
 
-        # read axfs for fsimage0
-        fsimage0.seek(0x120)
-        axfs_fsimage0 = axfs.AXFS(fsimage0)
-        with tarfile.open(os.path.join(dst, "fsimage0.tar"), mode="w") as tar_fsimage0:
-            axfs_fsimage0.toTar(0, tar_fsimage0)
+    # read axfs for fsimage0
+    fsimage0.seek(0x120)
+    axfs_fsimage0 = axfs.AXFS(fsimage0)
+    with tarfile.open(os.path.join(dst, "fsimage0.tar"), mode="w") as tar_fsimage0:
+        axfs_fsimage0.toTar(0, tar_fsimage0)
 
     # decrypt fsimage1
-    with tar.extractfile("./fsimage1.trf") as fsimage1:
-        decrypted = decrypt(fsimage1)
-        with open(os.path.join(dst, "fsimage1.img"), "wb") as f:
-            f.write(decrypted)
+    fsimage1 = tar.extractfile("./fsimage1.trf")
+    if fsimage1 is None:
+        raise ValueError("fsimage1.trf not found")
+    decrypted = decrypt(fsimage1)
+    with open(os.path.join(dst, "fsimage1.img"), "wb") as f:
+        f.write(decrypted)
 
-        # read axfs for fsimage1
-        axfs_fsimage1 = axfs.AXFS(BytesIO(decrypted))
-        with tarfile.open(os.path.join(dst, "fsimage1.tar"), mode="w") as tar_fsimage1:
-            axfs_fsimage1.toTar(0, tar_fsimage1)
+    # read axfs for fsimage1
+    axfs_fsimage1 = axfs.AXFS(BytesIO(decrypted))
+    with tarfile.open(os.path.join(dst, "fsimage1.tar"), mode="w") as tar_fsimage1:
+        axfs_fsimage1.toTar(0, tar_fsimage1)
 
     # decrypt vmlinux image
     vmlinux = tar.extractfile("./vmlinux.trf")
+    if vmlinux is None:
+        raise ValueError("vmlinux.trf not found")
     with open(os.path.join(dst, "vmlinux.img"), "wb") as f:
         f.write(decrypt(vmlinux))
 

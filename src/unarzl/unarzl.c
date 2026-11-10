@@ -1,7 +1,26 @@
-#include <memory.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
+
+#define EXPORT __attribute__ ((visibility ("default")))
+#define NULL ((void*)0)
+
+void* memcpy(void* dst, const void* src, uint32_t size) {
+  char* pdst = (char*)dst;
+  char* psrc = (char*)src;
+  while(size) {
+    *pdst++ = *psrc++;
+    size--;
+  }
+  return dst;
+}
+
+void* memset(void* dst, char b, uint32_t size) {
+  char* pdst = (char*)dst;
+  while(size) {
+    *pdst++ = b;
+    size--;
+  }
+  return dst;
+}
 
 int arzl_decompress(unsigned char *buffer, unsigned int buflen, const unsigned char *input, const unsigned char **endptr)
 {
@@ -706,96 +725,16 @@ LABEL_13:
   return len;
 }
 
-int main(int argc, const char *argv[])
-{
-  FILE *input;
-  FILE *output;
-  long int size;
-  long int count;
-  char *inbuf;
-  char *outbuf;
-  int outlen;
-  int len;
+EXPORT int unarzl(unsigned char* buffer, unsigned int buflen, unsigned char* input) {
   int ret;
-
-  input = output = NULL;
-  inbuf = outbuf = NULL;
-  ret = 1;
-  if (argc < 2)
-  {
-    fprintf(stderr, "usage: %s input [output]\n", argv[0]);
-    return 1;
+  ret = arzl_decompress(buffer, buflen, input+4, NULL);
+  if(ret < 0) {
+    return ret;
   }
-
-  if ((input = fopen(argv[1], "rb")) == NULL)
-  {
-    perror("input");
-    goto error;
+  uint32_t outlen = ret;
+  ret = arzl_deobfuscate(buffer, outlen, 2);
+  if(ret < 0) {
+    return ret;
   }
-
-  output = stdout;
-  if (argc > 2 && (output = fopen(argv[2], "wb")) == NULL)
-  {
-    perror("output");
-    goto error;
-  }
-
-  fseek(input, 0, SEEK_END);
-  if ((size = ftell(input)) < 0)
-  {
-    perror("input");
-    goto error;
-  }
-  fseek(input, 0, SEEK_SET);
-
-  if ((inbuf = malloc(size)) == NULL)
-  {
-    perror("memory");
-    goto error;
-  }
-  outlen = (int)size;
-
-  count = 0;
-  while ((count = fread(inbuf+count, sizeof(char), size, input)) < size)
-  {
-    if (count < 0)
-    {
-      perror("read");
-      goto error;
-    }
-    size -= count;
-  }
-
-  do
-  {
-    outlen *= 2; // resize buffer
-    outbuf = realloc(outbuf, outlen);
-    len = arzl_decompress((uint8_t *)outbuf, outlen, (uint8_t *)inbuf+4, NULL);
-  } while (len == 0x80560201); // out of space
-
-  if (len < 0)
-  {
-    fprintf(stderr, "Error decompressing: 0x%08X\n", len);
-    goto error;
-  }
-  arzl_deobfuscate((uint8_t *)outbuf, len, 2);
-
-  count = 0;
-  while ((count = fwrite(outbuf+count, sizeof(char), len, output)) < len)
-  {
-    if (count < 0)
-    {
-      perror("write");
-      goto error;
-    }
-    len -= count;
-  }
-
-  ret = 0;
-error:
-  free(outbuf);
-  free(inbuf);
-  fclose(output);
-  fclose(input);
-  return ret;
+  return outlen;
 }

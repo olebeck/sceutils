@@ -1,18 +1,9 @@
-import os
-import sys
-import pup_fiction
+#!/bin/python3
+import sys, os
+sys.path.append(os.path.dirname(__file__)+"/src")
 
-
-def main(argv):
-    " main "
-    if len(argv) != 2:
-        print("Usage: unpack_bootimage_new.py bootimage.skprx output-dir/")
-        return
-    
-    out_dir = argv[1]
-    os.makedirs(out_dir, exist_ok=True)
-    pup_fiction.extract_bootimage(argv[0], out_dir)
-
-
-if __name__ == "__main__":
-    main(sys.argv[1:])
+from sceutils.unpack_bootimage_new import main
+if __name__ == '__main__':
+    if sys.argv[0].endswith('.exe'):
+        sys.argv[0] = sys.argv[0][:-4]
+    sys.exit(main())
