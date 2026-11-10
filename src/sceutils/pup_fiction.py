@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from unarzl.unarzl import unarzl
+from unarzl import unarzl
 
 import argparse
 import glob
@@ -9,7 +9,6 @@ import struct
 import subprocess
 import sys
 from collections import defaultdict
-from typing import Optional
 
 from Cryptodome.Cipher import AES
 
@@ -301,10 +300,11 @@ def extract_bootimage(filename: str, output: str):
         basename = name[name.rfind("/") + 1:]
         start = u32(data, entry_off + 4) - base_va
         size = u32(data, entry_off + 8)
+        name, _ = os.path.splitext(basename)
 
         print(f"Writing {name}...")
         mod = data[start:start + size]
-        with open(os.path.join(output, basename+".elf"), "wb") as fout:
+        with open(os.path.join(output, name+".elf"), "wb") as fout:
             fout.write(mod)
 
 

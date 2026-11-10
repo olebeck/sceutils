@@ -149,13 +149,13 @@ def self2elf(inf: IO[bytes], outf: IO[bytes] | None = None, klictxt=b'\0'*16, si
         dat = inf.read(segment_info.size)
 
         # encryption
-        if segment_infos[idx].plaintext == SecureBool.NO.value:
+        if segment_infos[idx].plaintext == SecureBool.NO:
             ctr = Counter.new(128, initial_value=int.from_bytes(scesegs[i].iv, "big"))
             section_aes = AES.new(scesegs[i].key, AES.MODE_CTR, counter=ctr)
             dat = section_aes.decrypt(dat)
         
         # compression
-        if segment_infos[idx].compressed == SecureBool.YES.value:
+        if segment_infos[idx].compressed == SecureBool.YES:
             z = zlib.decompressobj()
             dat = z.decompress(dat)
 

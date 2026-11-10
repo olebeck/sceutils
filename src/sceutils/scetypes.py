@@ -125,7 +125,7 @@ class Struct:
     def __init__(self, **kwargs):
         for field_name, field_type in self.field_names():
             value = kwargs.get(field_name)
-            if isinstance(field_type, Enum):
+            if isinstance(field_type, type) and issubclass(field_type, Enum):
                 value = field_type(value)
             setattr(self, field_name, value)
 
@@ -152,7 +152,12 @@ class Struct:
         return instance
     
     def pack(self, endian="<") -> bytes:
-        values = tuple(getattr(self, name) for name, type in self.field_names())
+        values = []
+        for name, _ in self.field_names():
+            value = getattr(self, name)
+            if isinstance(value, Enum):
+                value = value.value
+            values.append(value)
         return struct.pack(endian + self._format, *values)
     
     def __str__(self) -> str:
@@ -178,14 +183,12 @@ class SceHeader(Struct):
     header_length: int
     data_length: int
     
-    def _initialize(self):
+    def _check(self):
         if self.magic != SCE_MAGIC:
             raise TypeError('Invalid SCE magic')
         if self.version != 3:
             raise TypeError('Unknown SCE version')
-        self.sce_type = SceType(self.sce_type)
-        self.platform = SelfPlatform(self.platform)
-    
+
     def __str__(self):
         ret = 'SCE Header:\n'
         ret += f' Version: {self.version}\n'

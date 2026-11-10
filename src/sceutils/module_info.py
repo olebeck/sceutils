@@ -1,9 +1,8 @@
 import json
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
-from .scetypes import (ElfHeader, ElfPhdr, SceModuleImports,
-                               SceModuleImports2, SceModuleInfo, SceModuleLibaryExports)
+from .scetypes import (ElfHeader, ElfPhdr, SceModuleImports, SceModuleImports2, SceModuleInfo, SceModuleLibaryExports)
 from .util import c_str
 
 
@@ -130,7 +129,8 @@ def main(argv = sys.argv):
     info = {
         "module_name": module_info.module_name,
         "module_nid": hex(module_info.module_nid),
-        "imports": imports
+        "imports": [asdict(item) for item in imports],
+        "exports": [asdict(item) for item in exports],
     }
     print(json.dumps(info, indent=2))
 

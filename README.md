@@ -1,52 +1,96 @@
+sceutils
+========
+
+Utilities for working with PlayStation Vita SCE / SELF / PUP files.
+
 Requirements
-============
+------------
 
-ubuntu 18.04 (or bash on windows ubuntu equivalent)
+* Python 3.11+
+* pycryptodomex
 
-python3
+Installation
+------------
 
-p7zip-full (for exfat)
-gcc and make (to compile unazlr)
+```sh
+pip install .
+```
 
+Usage
+-----
 
-python3:
-* pycryptodome
+### As a command line tool
 
+```sh
+sceutils --help
+sceutils selfinfo file.self
+sceutils self2elf -i eboot.bin -o eboot.elf -K keys_external.py
+sceutils pup_fiction PSP2UPDATE.pup output keys_external.py
+```
 
+The ARZL helper is also available directly:
 
+```sh
+unarzl kernel_boot_loader.self.seg03 nsbl.bin
+```
 
-usage
-=====
+### As a library
 
-pup_fiction.py
---------------
-### usage:
-* `./pup_fiction.py PUP_filename output_folder keys_file`
+```python
+from sceutils import self2elf, read_self_info, scedecrypt, unarzl, keys
 
+keys.use_keys("keys_external.py")
 
-### examples:
-* `./pup_fiction.py PSP2UPDATE.pup 368 keys_external.py`
+with open("eboot.bin", "rb") as inf, open("eboot.elf", "wb") as outf:
+    self2elf(inf, outf)
 
----
+with open("eboot.bin", "rb") as inf:
+    info = read_self_info(inf)
 
-self2elf.py
+with open("kernel_boot_loader.self.seg03", "rb") as f:
+    nsbl = unarzl(f.read())
+```
+
+Modules
+-------
+
+pup_fiction
 -----------
 ### usage:
-* `./self2elf.py -i [input self] -o [output elf] -k [RIF file] [-K keys_external.py]`
-* `./self2elf.py -i [input self] -o [output elf] -z [zRIF]` 
-
+* `sceutils pup_fiction PUP_filename output_folder keys_file`
 
 ### examples:
-* `./self2elf.py -i eboot.bin -o eboot.elf -z [zRIF here] [-K keys_external.py]`
-* `./self2elf.py -i eboot.bin -o eboot.elf -k [RIF] [-K keys_external.py]`
+* `sceutils pup_fiction PSP2UPDATE.pup 368 keys_external.py`
 
 ---
 
-axfs.py
--------
+self2elf
+--------
 ### usage:
-* `./axfs.py [list|tar] [image_name] [output_name]`
+* `sceutils self2elf -i [input self] -o [output elf] -k [RIF file] [-K keys_external.py]`
+* `sceutils self2elf -i [input self] -o [output elf] -z [zRIF]`
 
 ### examples:
-* `./axfs.py list fsimage.img`
-* `./axfs.py tar fsimage.img [fsimage.tar]`
+* `sceutils self2elf -i eboot.bin -o eboot.elf -z [zRIF here] [-K keys_external.py]`
+* `sceutils self2elf -i eboot.bin -o eboot.elf -k [RIF] [-K keys_external.py]`
+
+---
+
+selfinfo
+--------
+### usage:
+* `sceutils selfinfo [input self] [-K keys_external.py]`
+
+Prints the SCE header, SELF header, app info, control info, ELF headers,
+segment metadata and (when possible) module imports/exports.
+
+---
+
+axfs
+----
+### usage:
+* `sceutils axfs [list|tar] image_name [output_name]`
+
+### examples:
+* `sceutils axfs list fsimage.img`
+* `sceutils axfs tar fsimage.img [fsimage.tar]`

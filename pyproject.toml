@@ -1,7 +1,7 @@
 [project]
 name = "sceutils"
 version = "0.1.0"
-description = "Add your description here"
+description = "Utilities for PlayStation Vita SCE files"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,4 +13,12 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-sceutils = "sceutils.main:main"
+sceutils = "sceutils.__main__:main"
+unarzl = "unarzl.__main__:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["sceutils*", "unarzl*"]
